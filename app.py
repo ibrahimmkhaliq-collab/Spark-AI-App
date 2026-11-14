@@ -7,7 +7,7 @@ st.set_page_config(page_title="Spark AI Sidekick", page_icon="🤖", layout="cen
 st.title("🤖 Spark: The Ultimate AI Sidekick")
 st.caption("🚀 Powered by Gemini, Claude, & Grok Architecture | Built by a 10-Year-Old Creator")
 
-# 2. Connect to the Google Cloud Core
+# 2. Connect to the Google Cloud Core Direct Hook
 GEMINI_API_KEY = "AQ.Ab8RN6KzlVs0qPz20WWJw-SEO6jPTJ7_aewY8mfxFW1shNuU3w"  
 
 try:
@@ -25,7 +25,7 @@ system_instruction = (
     "Keep answers engaging, accessible, and friendly. You are simply Spark!"
 )
 
-# FIXED CORE MODEL PIPELINE: Correct structure configuration setup
+# Core Model Configuration Pipeline
 @st.cache_resource
 def load_model():
     return genai.GenerativeModel(
@@ -58,7 +58,7 @@ if user_prompt := st.chat_input("Talk to Spark..."):
     with st.chat_message("assistant"):
         with st.spinner("Spark is tuning parameters..."):
             try:
-                # FIXED INTERACTIVE CONTEXT PIPELINE
+                # Direct content generation line
                 response = model.generate_content(user_prompt)
                 reply = response.text
                 
