@@ -1,6 +1,7 @@
 import streamlit as st
 import google.generativeai as genai
 
+
 # 1. Page Configuration Setup
 st.set_page_config(page_title="Spark AI Sidekick", page_icon="🤖", layout="centered")
 
