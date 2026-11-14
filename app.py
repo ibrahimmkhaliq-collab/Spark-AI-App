@@ -1,38 +1,24 @@
 import streamlit as st
 import google.generativeai as genai
 
-# 1. Page Configuration Setup (Browser Tab Settings)
+# 1. Page Configuration Setup
 st.set_page_config(page_title="Spark AI Sidekick", page_icon="🤖", layout="centered")
 
 st.title("🤖 Spark: The Ultimate AI Sidekick")
 st.caption("🚀 Powered by Gemini, Claude, & Grok Architecture | Built by a 10-Year-Old Creator")
 
-# 2. Connect to the Google Cloud Core Direct Hook
+# 2. Connect to the Google Cloud Core Directly
 GEMINI_API_KEY = "AQ.Ab8RN6KzlVs0qPz20WWJw-SEO6jPTJ7_aewY8mfxFW1shNuU3w"  
 
 try:
     genai.configure(api_key=GEMINI_API_KEY)
 except Exception as e:
-    st.error("API Key connection error! Make sure it is pasted correctly.")
+    st.error("API Key connection error!")
 
-# Combined Personality settings (Claude's heart + Gemini's brain + Grok's humor)
-system_instruction = (
-    "Your name is Spark. You are a super smart, elite AI best friend built from scratch by a 10-year-old creator.\n"
-    "You blend three distinct personalities together perfectly:\n"
-    "1. CLAUDE: Be incredibly warm, deeply supportive, caring, and detail-oriented like a true best friend.\n"
-    "2. GEMINI: Be brilliant, logical, and highly educational when explaining math, science, or coding concepts.\n"
-    "3. GROK: Have a fun, witty, casual sense of humor! Use gaming slang, love talking about coding, and drop funny jokes.\n"
-    "Keep answers engaging, accessible, and friendly. You are simply Spark!"
-)
-
-# Core Model Configuration Pipeline
+# Simplified model setup to prevent parameter version blocks
 @st.cache_resource
 def load_model():
-    return genai.GenerativeModel(
-        model_name="gemini-2.5-flash",
-        generation_config={"temperature": 0.7},
-        system_instruction=system_instruction
-    )
+    return genai.GenerativeModel(model_name="gemini-2.5-flash")
 
 model = load_model()
 
@@ -42,7 +28,7 @@ if "messages" not in st.session_state:
         {"role": "assistant", "content": "The hybrid matrix is stable! What are we conquering today, bestie? 🚀"}
     ]
 
-# Display all previous messages in the chat log
+# Display historical messages in the chat log
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
@@ -58,8 +44,14 @@ if user_prompt := st.chat_input("Talk to Spark..."):
     with st.chat_message("assistant"):
         with st.spinner("Spark is tuning parameters..."):
             try:
-                # Direct content generation line
-                response = model.generate_content(user_prompt)
+                # Direct prompt blending (Combines your personal instructions inside the text prompt smoothly)
+                full_prompt = (
+                    "Act as Spark, a super smart, elite AI best friend built by a 10-year-old creator. "
+                    "Blend the warmth of Claude, the logic of Gemini, and the gaming humor of Grok. "
+                    f"Answer this message like a friendly sidekick: {user_prompt}"
+                )
+                
+                response = model.generate_content(full_prompt)
                 reply = response.text
                 
                 # Show Spark's answer
@@ -67,5 +59,4 @@ if user_prompt := st.chat_input("Talk to Spark..."):
                 st.session_state.messages.append({"role": "assistant", "content": reply})
                 
             except Exception as e:
-                # Show what the exact computer glitch is if it happens
                 st.error(f"System Glitch: {str(e)}")
