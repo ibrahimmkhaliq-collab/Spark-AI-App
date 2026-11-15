@@ -1,5 +1,5 @@
 import streamlit as st
-from google import genai
+import google.generativeai as genai
 
 # 1. Page Configuration Setup
 st.set_page_config(page_title="Spark AI Sidekick", page_icon="🤖", layout="centered")
@@ -10,8 +10,7 @@ st.caption("🚀 Powered by Gemini, Claude, & Grok Architecture | Built by a 10-
 # 2. Connect securely using the hidden vault configuration setup
 try:
     GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
-    # FIXED: Uses the verified modern Client initialization for AQ.Ab keys
-    client = genai.Client(api_key=GEMINI_API_KEY)
+    genai.configure(api_key=GEMINI_API_KEY)
 except Exception as e:
     st.warning("Waiting for the secure API Key to be saved in the Secrets vault panel...")
 
@@ -45,16 +44,16 @@ if user_prompt := st.chat_input("Talk to Spark..."):
                     "Keep answers engaging, accessible, and friendly. You are simply Spark!"
                 )
                 
-                # FIXED: Uses the official models generation endpoint matching the client
-                response = client.models.generate_content(
-                    model="gemini-2.5-flash",
-                    contents=user_prompt,
-                    config={"system_instruction": system_instruction}
+                # Load the stable generative model endpoint
+                model = genai.GenerativeModel(
+                    model_name="gemini-2.5-flash",
+                    system_instruction=system_instruction
                 )
                 
+                response = model.generate_content(user_prompt)
                 reply = response.text
+                
                 st.write(reply)
                 st.session_state.messages.append({"role": "assistant", "content": reply})
             except Exception as e:
                 st.error(f"System Glitch: {str(e)}")
-
