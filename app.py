@@ -1,6 +1,5 @@
 import streamlit as st
 import requests
-import random
 
 # 1. Page Configuration Setup (Wide ChatGPT Layout)
 st.set_page_config(
@@ -13,13 +12,13 @@ st.set_page_config(
 st.title("🤖 Spark: The Ultimate AI Sidekick")
 st.caption("🚀 Powered by Ultra-Fast Groq Cloud Core | Built by a 10-Year-Old Creator")
 
-# 2. Connect safely to the ultra-fast Groq engine vault
+# 2. FIXED SECURE CONNECTION: Grabs the hidden key safely out of your secure vault
 try:
     GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
 except Exception:
     st.warning("Waiting for the secure GROQ_API_KEY to be saved in the Secrets vault panel...")
 
-# 3. CHAT THREAD STORAGE MANAGER (Automatically saves logs in memory matrix)
+# 3. CHAT THREAD STORAGE MANAGER
 if "threads" not in st.session_state:
     st.session_state.threads = {
         "Chat Thread 1": [{"role": "assistant", "content": "The hyper-speed matrix is stable! Ask me absolutely anything in the universe, bestie? 🚀"}]
@@ -28,11 +27,10 @@ if "threads" not in st.session_state:
 if "current_thread" not in st.session_state:
     st.session_state.current_thread = "Chat Thread 1"
 
-# 4. DESIGNING THE SIDEBAR (The Thread Management Dashboard)
+# 4. DESIGNING THE SIDEBAR (The Thread List Window)
 with st.sidebar:
     st.title("💬 Spark Conversations")
     
-    # ➕ Create Fresh Thread Button
     if st.button("➕ New Chat Thread", use_container_width=True):
         new_id = f"Chat Thread {len(st.session_state.threads) + 1}"
         st.session_state.threads[new_id] = [
@@ -42,32 +40,8 @@ with st.sidebar:
         st.rerun()
         
     st.markdown("---")
-    st.subheader("Active Thread Controls")
-    
-    # 📝 RENAME ACTIVE THREAD
-    new_name_input = st.text_input("Rename current chat:", value=st.session_state.current_thread, key="rename_field")
-    if new_name_input and new_name_input != st.session_state.current_thread:
-        if new_name_input not in st.session_state.threads:
-            # Transfer old conversation arrays to the new name key folder slot
-            st.session_state.threads[new_name_input] = st.session_state.threads.pop(st.session_state.current_thread)
-            st.session_state.current_thread = new_name_input
-            st.success("Renamed successfully!")
-            st.rerun()
-            
-    # 🗑️ DELETE ACTIVE THREAD
-    if st.button("🗑️ Delete Current Chat", use_container_width=True, type="primary"):
-        if len(st.session_state.threads) > 1:
-            st.session_state.threads.pop(st.session_state.current_thread)
-            st.session_state.current_thread = list(st.session_state.threads.keys())[0]
-            st.success("Chat deleted!")
-            st.rerun()
-        else:
-            st.error("You must keep at least one active conversation thread folder!")
-
-    st.markdown("---")
     st.subheader("History Logs")
     
-    # Render clickable list navigation buttons
     for thread_name in list(st.session_state.threads.keys()):
         is_active = (thread_name == st.session_state.current_thread)
         button_label = f"📝 {thread_name}" if not is_active else f"🔥 {thread_name} (Active)"
@@ -76,7 +50,6 @@ with st.sidebar:
             st.session_state.current_thread = thread_name
             st.rerun()
 
-# Fetch active history logs arrays
 active_messages = st.session_state.threads[st.session_state.current_thread]
 
 # Display historical messages in the active thread log
@@ -117,9 +90,7 @@ if user_prompt := st.chat_input("Ask Spark anything..."):
                 reply = response.json()['choices']['message']['content']
                 
                 st.write(reply)
-                # Auto Save: Appends directly to your active thread matrix folder so it stays saved!
-                active_messages.append({"role": "assistant", "content": reply})
-                st.rerun()
+                st.session_state.messages.append({"role": "assistant", "content": reply})
                 
             except Exception as e:
                 st.error("Engine hiccup! Let's try sending that question one more time, bestie!")
