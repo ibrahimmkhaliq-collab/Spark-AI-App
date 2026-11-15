@@ -1,5 +1,6 @@
 import streamlit as st
 import requests
+import random  # FIXED: Missing tool added to prevent crashes!
 
 # 1. Page Configuration Setup
 st.set_page_config(page_title="Spark AI Sidekick", page_icon="🤖", layout="centered")
@@ -42,7 +43,7 @@ if user_prompt := st.chat_input("Talk to Spark..."):
                 )
                 
                 payload = {"inputs": system_prompt, "parameters": {"max_new_tokens": 150, "temperature": 0.7}}
-                response = requests.post(API_URL, json=payload, timeout=5) # 5-second timer limit
+                response = requests.post(API_URL, json=payload, timeout=5)
                 output = response.json()
                 
                 if isinstance(output, list) and len(output) > 0 and 'generated_text' in output:
