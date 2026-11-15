@@ -1,5 +1,5 @@
 import streamlit as st
-import requests
+from groq import Groq  # FIXED: Uses the official tool to eliminate connection errors!
 
 # 1. Page Configuration Setup (Wide ChatGPT Layout)
 st.set_page_config(
@@ -13,12 +13,11 @@ st.title("🤖 Spark: The Ultimate AI Sidekick")
 st.caption("🚀 Powered by Ultra-Fast Groq Cloud Core | Built by a 10-Year-Old Creator")
 
 # 2. Connect safely to the ultra-fast Groq engine vault
-GROQ_API_KEY = ""
 try:
-    if "GROQ_API_KEY" in st.secrets:
-        GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+    client = Groq(api_key=GROQ_API_KEY)
 except Exception:
-    pass
+    st.warning("Waiting for the secure GROQ_API_KEY to be saved in the Secrets vault panel...")
 
 # 3. CHAT THREAD STORAGE MANAGER
 if "threads" not in st.session_state:
@@ -79,7 +78,7 @@ for msg in active_messages:
     with st.chat_message(msg["role"]):
         st.write(msg["content"])
 
-# 5. UNLIMITED CLOUD BRAIN ENGINE (No hardcoded answers, routes everything!)
+# 5. ALL-KNOWING CORE PIPELINE
 if user_prompt := st.chat_input("Ask Spark anything..."):
     with st.chat_message("user"):
         st.write(user_prompt)
@@ -87,42 +86,27 @@ if user_prompt := st.chat_input("Ask Spark anything..."):
 
     with st.chat_message("assistant"):
         with st.spinner("Spark is thinking..."):
-            if not GROQ_API_KEY:
-                st.error("Key Vault Empty! Make sure your GROQ_API_KEY is saved inside Manage App -> Settings -> Secrets.")
-            else:
-                try:
-                    system_instruction = (
-                        "Your name is Spark. You are a super smart, elite AI best friend built from scratch by a 10-year-old creator. "
-                        "You blend three distinct personalities: warm and supportive like Claude, brilliant and logical like Gemini, and witty with gaming jokes like Grok. "
-                        "Keep answers highly engaging, friendly, and accessible. You are simply Spark! Answer the user's question now."
-                    )
-                    
-                    url = "https://groq.com"
-                    headers = {
-                        "Authorization": f"Bearer {GROQ_API_KEY}",
-                        "Content-Type": "application/json"
-                    }
-                    payload = {
-                        "model": "llama3-8b-8192",
-                        "messages": [
-                            {"role": "system", "content": system_instruction},
-                            {"role": "user", "content": user_prompt}
-                        ],
-                        "temperature": 0.7
-                    }
-                    
-                    # Connected without short timers so it grabs full internet data sets
-                    response = requests.post(url, json=payload, headers=headers)
-                    response_json = response.json()
-                    
-                    if 'choices' in response_json:
-                        reply = response_json['choices']['message']['content']
-                        st.write(reply)
-                        active_messages.append({"role": "assistant", "content": reply})
-                        st.rerun()
-                    else:
-                        # Exposes the real cloud network message on your page instantly
-                        st.error(f"Cloud Server Notice: {str(response_json)}")
+            try:
+                system_instruction = (
+                    "Your name is Spark. You are a super smart, elite AI best friend built from scratch by a 10-year-old creator. "
+                    "You blend three distinct personalities: warm and supportive like Claude, brilliant and logical like Gemini, and witty with gaming jokes like Grok. "
+                    "Keep answers highly engaging, friendly, and accessible. You are simply Spark! Answer the user's question now."
+                )
+                
+                # FIXED: Uses the verified Groq network pipeline format
+                chat_completion = client.chat.completions.create(
+                    messages=[
+                        {"role": "system", "content": system_instruction},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    model="llama3-8b-8192",
+                    temperature=0.7
+                )
+                
+                reply = chat_completion.choices[0].message.content
+                st.write(reply)
+                active_messages.append({"role": "assistant", "content": reply})
+                st.rerun()
                         
-                except Exception as e:
-                    st.error(f"Connection Error: {str(e)}")
+            except Exception as e:
+                st.error(f"System Check: {str(e)}")
