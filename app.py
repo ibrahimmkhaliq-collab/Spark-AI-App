@@ -1,20 +1,22 @@
 import streamlit as st
 import requests
-import random
 
-# 1. Page Configuration Setup - FORCES SIDEBAR OPEN ON LAPTOPS ALWAYS
+# 1. Page Configuration Setup (Wide ChatGPT Layout)
 st.set_page_config(
     page_title="Spark AI Sidekick", 
     page_icon="🤖", 
     layout="wide", 
-    initial_sidebar_state="expanded"  # Pins it open by default!
+    initial_sidebar_state="expanded"
 )
 
 st.title("🤖 Spark: The Ultimate AI Sidekick")
 st.caption("🚀 Powered by Ultra-Fast Groq Cloud Core | Built by a 10-Year-Old Creator")
 
-# 2. Connect safely to the ultra-fast Groq engine using your live cloud key
-GROQ_API_KEY = "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"
+# 2. FIXED SECURE CONNECTION: Grabs the hidden key safely out of your secure vault
+try:
+    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
+except Exception:
+    st.warning("Waiting for the secure GROQ_API_KEY to be saved in the Secrets vault panel...")
 
 # 3. CHAT THREAD STORAGE MANAGER
 if "threads" not in st.session_state:
