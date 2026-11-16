@@ -56,7 +56,7 @@ def save_permanent_memory(messages):
 
 def build_powerpoint_presentation(topic, content_str):
     prs = Presentation()
-    slide_layout = prs.slide_layouts[6] 
+    slide_layout = prs.slide_layouts 
     slide = prs.slides.add_slide(slide_layout)
     
     background = slide.background
@@ -82,7 +82,7 @@ def build_powerpoint_presentation(topic, content_str):
             continue
         if line.startswith("###") or line.startswith("Slide"):
             if current_bullets:
-                bullet_layout = prs.slide_layouts[6] 
+                bullet_layout = prs.slide_layouts 
                 s = prs.slides.add_slide(bullet_layout)
                 
                 t_box = s.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(1))
@@ -108,7 +108,7 @@ def build_powerpoint_presentation(topic, content_str):
                 current_bullets.append(clean_b[:120]) 
                 
     if current_bullets:
-        bullet_layout = prs.slide_layouts[6]
+        bullet_layout = prs.slide_layouts
         s = prs.slides.add_slide(bullet_layout)
         t_box = s.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(1))
         t_p = t_box.text_frame.add_paragraph()
