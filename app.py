@@ -214,7 +214,7 @@ if user_prompt or (uploaded_image and creation_intent == "💬 Standard Chat/Vis
         
         with st.spinner("🎨 Mixing paints..."):
             encoded_prompt = urllib.parse.quote(user_prompt)
-            generated_img_url = f"https://pollinations.ai{encoded_prompt}?width=800&height=600&seed=42&nofeed=true"
+            generated_img_url = f"https://image.pollinations.ai/p/{encoded_prompt}?width=800&height=600&seed=42&nofeed=true"
             
             st.image(generated_img_url, use_container_width=True)
             st.session_state.messages.append({"role": "assistant", "content": f"🖼️ IMAGE_GEN: {generated_img_url}"})
