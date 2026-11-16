@@ -2,33 +2,46 @@ import streamlit as st
 from groq import Groq
 import json
 import os
+import base64
+import urllib.parse
+from pptx import Presentation
+from pptx.util import Inches, Pt
+from pptx.dml.color import RGBColor
 from streamlit.runtime.scriptrunner import get_script_run_ctx
 
-# Set up the webpage title, icon, and layout
-st.set_page_config(page_title="Spark AI Sidekick", page_icon="⚡", layout="centered")
+# Set up the webpage layout and title
+st.set_page_config(page_title="Spark AI Creator Studio", page_icon="⚡", layout="centered")
 
-# Custom CSS styling to make the app look awesome
+# Visual Theme CSS
 st.markdown("""
     <style>
-    .main { background-color: #f5f7fa; }
-    .stTextInput>div>div>input { border-radius: 20px; }
-    .stButton>button { border-radius: 20px; background-color: #4A90E2; color: white; }
-    .chat-bubble-user { background-color: #E3F2FD; padding: 12px; border-radius: 15px; margin: 6px 0; border-left: 5px solid #2196F3; }
-    .chat-bubble-spark { background-color: #FFF9C4; padding: 12px; border-radius: 15px; margin: 6px 0; border-left: 5px solid #FFEB3B; }
+    .main { background-color: #f8fafc; }
+    .stTextInput>div>div>input { border-radius: 20px; border: 1px solid #cbd5e1; }
+    .stButton>button { border-radius: 20px; background-color: #4f46e5; color: white; transition: all 0.3s; width: 100%; }
+    .stButton>button:hover { background-color: #4338ca; transform: scale(1.02); }
+    .chat-bubble-user { background-color: #eff6ff; padding: 14px; border-radius: 18px; margin: 8px 0; border-left: 6px solid #3b82f6; }
+    .chat-bubble-spark { background-color: #fef9c3; padding: 14px; border-radius: 18px; margin: 8px 0; border-left: 6px solid #eab308; }
+    .creator-box { background-color: #f0fdf4; padding: 15px; border-radius: 15px; border: 1px solid #bbf7d0; margin: 10px 0; }
     </style>
     """, unsafe_check_html=True)
 
-st.title("⚡ Spark AI Sidekick")
-st.caption("Upgraded: Isolated Private Memories, Backups, and Live Audio Transcription!")
+st.title("⚡ Spark AI: Creator Studio")
+st.caption("AI Studio Engine Connected: Text, Voice, Deep Logic, Vision, Image Generation, & Presentation Building!")
 
-# Find the unique browser session ID for the user
+# Session ID Isolation Setup
 def get_user_session_id():
     ctx = get_script_run_ctx()
     return ctx.session_id if ctx is not None else "default_user"
 
-# Initialize file paths
 SESSION_ID = get_user_session_id()
 MEMORY_FILE = f"spark_chat_{SESSION_ID}.json"
+
+PERSONALITIES = {
+    "🤖 Helpful Sidekick": "You are Spark, a helpful, encouraging, and brilliant AI sidekick created for an awesome young developer.",
+    "🧙‍♂️ Coding Wizard": "You are Spark, an elite software architect. Output clean, optimal code blocks with brief comments.",
+    "🧠 Strict Logic Teacher": "You are Spark, an academic mentor. Focus on step-by-step proofs and clean educational clarity.",
+    "🃏 Funny Joker": "You are Spark, a witty companion. Infuse jokes and funny analogies into every single reply!"
+}
 
 def load_permanent_memory():
     if os.path.exists(MEMORY_FILE):
@@ -37,127 +50,183 @@ def load_permanent_memory():
                 return json.load(f)
         except:
             pass
-    return [{"role": "system", "content": "You are Spark, a helpful and brilliant AI sidekick created for an awesome developer."}]
+    return []
 
 def save_permanent_memory(messages):
     with open(MEMORY_FILE, "w") as f:
         json.dump(messages, f, indent=4)
 
-# 1. Connect to Groq cloud engine securely
+# Build PPTX File Engine
+def build_powerpoint_presentation(topic, content_str):
+    prs = Presentation()
+    
+    # Slide 1: Title Slide
+    slide_layout = prs.slide_layouts[5] # Blank layout with title option or customizable coordinates
+    slide = prs.slides.add_slide(slide_layout)
+    
+    # Custom Background color
+    background = slide.background
+    fill = background.fill
+    fill.solid()
+    fill.fore_color.rgb = RGBColor(79, 70, 229) # Premium Indigo Color
+    
+    txBox = slide.shapes.add_textbox(Inches(1), Inches(2.5), Inches(8), Inches(2))
+    tf = txBox.text_frame
+    p = tf.add_paragraph()
+    p.text = topic.upper()
+    p.font.bold = True
+    p.font.size = Pt(44)
+    p.font.color.rgb = RGBColor(255, 255, 255)
+    
+    # Breakdown response text block into sub slides
+    lines = content_str.split("\n")
+    current_slide_title = "Summary Brief"
+    current_bullets = []
+    
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        if line.startswith("###") or line.startswith("Slide"):
+            if current_bullets:
+                # Flush existing slide components
+                bullet_layout = prs.slide_layouts[6] # Blank canvas
+                s = prs.slides.add_slide(bullet_layout)
+                
+                # Title
+                t_box = s.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(1))
+                t_p = t_box.text_frame.add_paragraph()
+                t_p.text = current_slide_title
+                t_p.font.bold = True
+                t_p.font.size = Pt(28)
+                t_p.font.color.rgb = RGBColor(30, 41, 59)
+                
+                # Bullets
+                b_box = s.shapes.add_textbox(Inches(0.7), Inches(1.8), Inches(8.5), Inches(4.5))
+                b_tf = b_box.text_frame
+                for b in current_bullets:
+                    bp = b_tf.add_paragraph()
+                    bp.text = f"• {b}"
+                    bp.font.size = Pt(18)
+                    bp.font.color.rgb = RGBColor(71, 85, 105)
+                
+            current_slide_title = line.replace("###", "").replace("Slide:", "").strip()
+            current_bullets = []
+        else:
+            clean_b = line.lstrip("-*•1234567890. ")
+            if clean_b:
+                current_bullets.append(clean_b[:120]) # Prevent overflow text rows
+                
+    # Save file Locally out
+    output_filename = f"spark_presentation_{SESSION_ID}.pptx"
+    prs.save(output_filename)
+    return output_filename
+
+# 1. Connect to Groq Cloud Engine
 try:
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 except Exception as e:
     st.error("🔑 Secrets Key Missing: Please check your Streamlit vault configurations.")
     st.stop()
 
-# 2. Synchronize existing history data
 if "messages" not in st.session_state:
     st.session_state.messages = load_permanent_memory()
 
-# 3. Print out conversation logs neatly
+# 2. Sidebar Configuration Suite
+with st.sidebar:
+    st.header("⚙️ Studio Dashboard")
+    
+    # Task Command Selector
+    st.subheader("🛠️ Choose Mode")
+    creation_intent = st.radio("What are we creating?", ["💬 Standard Chat/Vision", "🎨 Generate AI Image", "📊 Build Presentation Slide"])
+    
+    st.write("---")
+    st.subheader("🎭 Personality Shift")
+    selected_mood = st.selectbox("Spark's Current Persona:", list(PERSONALITIES.keys()))
+    system_prompt = PERSONALITIES[selected_mood]
+    
+    st.write("---")
+    st.subheader("🧠 Thought Controls")
+    reasoning_mode = st.toggle("Engage Deep Reasoning", value=False)
+    active_model = "qwen/qwen3.8-27b" if reasoning_mode else "llama-3.1-8b-instant"
+    
+    st.write("---")
+    st.subheader("🖼️ Vision File Drop")
+    uploaded_image = st.file_uploader("Drop image for evaluation:", type=["png", "jpg", "jpeg"])
+    
+    st.write("---")
+    st.subheader("🎙️ Speech Core Input")
+    voice_file = st.audio_input("Record voice")
+    
+    user_prompt = None
+    
+    # Process Voice Input
+    if voice_file is not None:
+        audio_bytes = voice_file.getvalue()
+        audio_hash = str(hash(audio_bytes))
+        if "last_audio_hash" not in st.session_state or st.session_state.last_audio_hash != audio_hash:
+            with st.spinner("Transcribing..."):
+                try:
+                    voice_file.name = "input.wav"
+                    transcription = client.audio.transcriptions.create(file=voice_file, model="whisper-large-v3-turbo", response_format="text")
+                    if transcription.strip():
+                        user_prompt = transcription.strip()
+                        st.session_state.last_audio_hash = audio_hash
+                except Exception as ex:
+                    st.error(f"Audio error: {str(ex)}")
+
+    st.write("---")
+    if st.button("🗑️ Full Reset Engine"):
+        if os.path.exists(MEMORY_FILE):
+            os.remove(MEMORY_FILE)
+        st.session_state.messages = []
+        save_permanent_memory([])
+        st.rerun()
+
+# 3. Print Logs to screen
+if not st.session_state.messages:
+    st.session_state.messages = [{"role": "system", "content": system_prompt}]
+else:
+    if st.session_state.messages[0]["role"] == "system":
+        st.session_state.messages[0]["content"] = system_prompt
+
 for msg in st.session_state.messages:
     if msg["role"] == "user":
         st.markdown(f'<div class="chat-bubble-user"><b>You:</b> {msg["content"]}</div>', unsafe_check_html=True)
     elif msg["role"] == "assistant":
-        st.markdown(f'<div class="chat-bubble-spark"><b>Spark:</b> {msg["content"]}</div>', unsafe_check_html=True)
+        # Check if the message content looks like a structural widget rather than raw text string
+        if msg["content"].startswith("🖼️ IMAGE_GEN:"):
+            img_url = msg["content"].replace("🖼️ IMAGE_GEN:", "").strip()
+            st.markdown('<div class="chat-bubble-spark"><b>Spark:</b> Your custom visual rendering is ready!</div>', unsafe_check_html=True)
+            st.image(img_url, use_container_width=True)
+        else:
+            st.markdown(f'<div class="chat-bubble-spark"><b>Spark:</b> {msg["content"]}</div>', unsafe_check_html=True)
 
-# 4. Input Configuration Strategy (Voice + Text Input Hub)
-user_prompt = None
+# 4. Keyboard Prompt Text Capture
+text_box_prompt = st.chat_input("Command your creator studio...")
+if text_box_prompt:
+    user_prompt = text_box_prompt
 
-# Keyboard text bar input at the bottom
-text_input = st.chat_input("Type a message to Spark...")
-if text_input:
-    user_prompt = text_input
-
-# Sidebar layout configurations
-with st.sidebar:
-    st.header("⚙️ Sidekick Settings")
-    st.write("Memory Mode: **Isolated Private Space 🔒**")
+# 5. Core execution logic fork
+if user_prompt or (uploaded_image and creation_intent == "💬 Standard Chat/Vision"):
     
-    st.write("---")
-    st.subheader("🎙️ Voice Mode Input")
-    st.caption("Record your voice to automatically transcribe and send text:")
-    
-    # Direct system browser recording widget
-    voice_file = st.audio_input("Record a message")
-    
-    # Check if a voice audio clip was recorded and hasn't been processed yet
-    if voice_file is not None:
-        # Create a unique key tracking if this audio file has already been sent
-        audio_bytes = voice_file.getvalue()
-        audio_hash = str(hash(audio_bytes))
+    # FORK 1: Direct Image Generation Engine
+    if creation_intent == "🎨 Generate AI Image":
+        st.markdown(f'<div class="chat-bubble-user"><b>You:</b> [Generate Image] {user_prompt}</div>', unsafe_check_html=True)
+        st.session_state.messages.append({"role": "user", "content": f"[Generate Image] {user_prompt}"})
         
-        if "last_audio_hash" not in st.session_state or st.session_state.last_audio_hash != audio_hash:
-            with st.spinner("🎙️ Transcribing voice audio..."):
-                try:
-                    # Provide an explicit file layout name so the tool reads the audio content properly
-                    voice_file.name = "input_audio.wav"
-                    
-                    # Call Groq's high-speed Whisper audio transcription platform
-                    transcription = client.audio.transcriptions.create(
-                        file=voice_file,
-                        model="whisper-large-v3-turbo",  # Ultra-fast transcription model
-                        response_format="text"
-                    )
-                    
-                    # Save the transcribed string as our prompt
-                    if transcription.strip():
-                        user_prompt = transcription.strip()
-                        st.session_state.last_audio_hash = audio_hash
-                except Exception as audio_err:
-                    st.error(f"❌ Audio transcription failed: {str(audio_err)}")
-
-    st.write("---")
-    st.subheader("💾 Export Chat Log")
-    
-    chat_text = ""
-    for msg in st.session_state.messages:
-        if msg["role"] == "user":
-            chat_text += f"You: {msg['content']}\n"
-        elif msg["role"] == "assistant":
-            chat_text += f"Spark: {msg['content']}\n"
+        with st.spinner("🎨 Mixing paints and rendering image pixels..."):
+            encoded_prompt = urllib.parse.quote(user_prompt)
+            # Fetch high-quality rendering via open-source pollination endpoint architecture
+            generated_img_url = f"https://pollinations.ai{encoded_prompt}?width=800&height=600&seed=42&nofeed=true"
             
-    st.download_button(
-        label="📥 Download My Chat Log",
-        data=chat_text,
-        file_name="spark_chat_history.txt",
-        mime="text/plain"
-    )
-    
-    st.write("---")
-    if st.button("🗑️ Reset My Chat Only"):
-        if os.path.exists(MEMORY_FILE):
-            os.remove(MEMORY_FILE)
-        if "last_audio_hash" in st.session_state:
-            del st.session_state.last_audio_hash
-        st.session_state.messages = [
-            {"role": "system", "content": "You are Spark, a helpful and brilliant AI sidekick created for an awesome developer."}
-        ]
-        save_permanent_memory(st.session_state.messages)
-        st.rerun()
-
-# 5. Process any active communication input discovered (Text or Transcribed Voice)
-if user_prompt:
-    st.markdown(f'<div class="chat-bubble-user"><b>You:</b> {user_prompt}</div>', unsafe_check_html=True)
-    st.session_state.messages.append({"role": "user", "content": user_prompt})
-    save_permanent_memory(st.session_state.messages)
-    
-    with st.spinner("Spark is thinking..."):
-        try:
-            completion = client.chat.completions.create(
-                model="llama-3.1-8b-instant",
-                messages=st.session_state.messages,
-                temperature=0.7,
-                max_tokens=1024
-            )
-            
-            spark_response = completion.choices.message.content
-            st.markdown(f'<div class="chat-bubble-spark"><b>Spark:</b> {spark_response}</div>', unsafe_check_html=True)
-            st.session_state.messages.append({"role": "assistant", "content": spark_response})
+            st.image(generated_img_url, use_container_width=True)
+            st.session_state.messages.append({"role": "assistant", "content": f"🖼️ IMAGE_GEN: {generated_img_url}"})
             save_permanent_memory(st.session_state.messages)
-            
-            # Instantly refresh to clear the audio file state so it doesn't double-trigger
             st.rerun()
-            
-        except Exception as e:
-            st.error(f"⚠️ Error connection broken: {str(e)}")
+
+    # FORK 2: Presentation Deck Builder
+    elif creation_intent == "📊 Build Presentation Slide":
+        st.markdown(f'<div class="chat-bubble-user"><b>You:</b> [Build Slideshow] {user_prompt}</div>', unsafe_check_html=True)
+        st.session_state.messages.append({"role": "user", "content": f"[Build Slideshow] {user_prompt}"})
+        
