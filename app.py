@@ -217,5 +217,5 @@ if user_prompt or (uploaded_image and creation_intent == "💬 Standard Chat/Vis
                 completion = client.chat.completions.create(
                     model="openai/gpt-oss-20b",
                     messages=[{"role": "system", "content": "You are a professional deck designer."}, {"role": "user", "content": slide_generation_instruction}],
-                    temperature=0.6
-                )
+                    temperature=0.6)
+                
