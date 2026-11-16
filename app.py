@@ -9,10 +9,8 @@ from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from streamlit.runtime.scriptrunner import get_script_run_ctx
 
-# Set up the webpage layout and title
 st.set_page_config(page_title="Spark AI Creator Studio", page_icon="⚡", layout="centered")
 
-# Visual Theme CSS
 st.markdown("""
     <style>
     .main { background-color: #f8fafc; }
@@ -28,7 +26,6 @@ st.markdown("""
 st.title("⚡ Spark AI: Creator Studio")
 st.caption("AI Studio Engine Connected: Text, Voice, Deep Logic, Vision, Image Generation, & Presentation Building!")
 
-# Session ID Isolation Setup
 def get_user_session_id():
     ctx = get_script_run_ctx()
     return ctx.session_id if ctx is not None else "default_user"
@@ -40,6 +37,7 @@ PERSONALITIES = {
     "🤖 Helpful Sidekick": "You are Spark, a helpful, encouraging, and brilliant AI sidekick created for an awesome young developer.",
     "🧙‍♂️ Coding Wizard": "You are Spark, an elite software architect. Output clean, optimal code blocks with brief comments.",
     "🧠 Strict Logic Teacher": "You are Spark, an academic mentor. Focus on step-by-step proofs and clean educational clarity.",
+    "🤖 Grok Clone": "You are Spark, channeling the persona of Grok. You are highly intelligent, a bit rebellious, and possess a sharp sense of humor.",
     "🃏 Funny Joker": "You are Spark, a witty companion. Infuse jokes and funny analogies into every single reply!"
 }
 
@@ -56,19 +54,15 @@ def save_permanent_memory(messages):
     with open(MEMORY_FILE, "w") as f:
         json.dump(messages, f, indent=4)
 
-# Build PPTX File Engine
 def build_powerpoint_presentation(topic, content_str):
     prs = Presentation()
-    
-    # Slide 1: Title Slide
-    slide_layout = prs.slide_layouts[5] # Blank layout with title option or customizable coordinates
+    slide_layout = prs.slide_layouts[6] 
     slide = prs.slides.add_slide(slide_layout)
     
-    # Custom Background color
     background = slide.background
     fill = background.fill
     fill.solid()
-    fill.fore_color.rgb = RGBColor(79, 70, 229) # Premium Indigo Color
+    fill.fore_color.rgb = RGBColor(79, 70, 229) 
     
     txBox = slide.shapes.add_textbox(Inches(1), Inches(2.5), Inches(8), Inches(2))
     tf = txBox.text_frame
@@ -78,7 +72,6 @@ def build_powerpoint_presentation(topic, content_str):
     p.font.size = Pt(44)
     p.font.color.rgb = RGBColor(255, 255, 255)
     
-    # Breakdown response text block into sub slides
     lines = content_str.split("\n")
     current_slide_title = "Summary Brief"
     current_bullets = []
@@ -89,11 +82,9 @@ def build_powerpoint_presentation(topic, content_str):
             continue
         if line.startswith("###") or line.startswith("Slide"):
             if current_bullets:
-                # Flush existing slide components
-                bullet_layout = prs.slide_layouts[6] # Blank canvas
+                bullet_layout = prs.slide_layouts[6] 
                 s = prs.slides.add_slide(bullet_layout)
                 
-                # Title
                 t_box = s.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(1))
                 t_p = t_box.text_frame.add_paragraph()
                 t_p.text = current_slide_title
@@ -101,7 +92,6 @@ def build_powerpoint_presentation(topic, content_str):
                 t_p.font.size = Pt(28)
                 t_p.font.color.rgb = RGBColor(30, 41, 59)
                 
-                # Bullets
                 b_box = s.shapes.add_textbox(Inches(0.7), Inches(1.8), Inches(8.5), Inches(4.5))
                 b_tf = b_box.text_frame
                 for b in current_bullets:
@@ -115,14 +105,12 @@ def build_powerpoint_presentation(topic, content_str):
         else:
             clean_b = line.lstrip("-*•1234567890. ")
             if clean_b:
-                current_bullets.append(clean_b[:120]) # Prevent overflow text rows
+                current_bullets.append(clean_b[:120]) 
                 
-    # Save file Locally out
     output_filename = f"spark_presentation_{SESSION_ID}.pptx"
     prs.save(output_filename)
     return output_filename
 
-# 1. Connect to Groq Cloud Engine
 try:
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 except Exception as e:
@@ -132,11 +120,9 @@ except Exception as e:
 if "messages" not in st.session_state:
     st.session_state.messages = load_permanent_memory()
 
-# 2. Sidebar Configuration Suite
 with st.sidebar:
     st.header("⚙️ Studio Dashboard")
     
-    # Task Command Selector
     st.subheader("🛠️ Choose Mode")
     creation_intent = st.radio("What are we creating?", ["💬 Standard Chat/Vision", "🎨 Generate AI Image", "📊 Build Presentation Slide"])
     
@@ -148,7 +134,7 @@ with st.sidebar:
     st.write("---")
     st.subheader("🧠 Thought Controls")
     reasoning_mode = st.toggle("Engage Deep Reasoning", value=False)
-    active_model = "qwen/qwen3.8-27b" if reasoning_mode else "llama-3.1-8b-instant"
+    active_model = "qwen/qwen3.8-27b" if reasoning_mode else "openai/gpt-oss-20b"
     
     st.write("---")
     st.subheader("🖼️ Vision File Drop")
@@ -160,7 +146,6 @@ with st.sidebar:
     
     user_prompt = None
     
-    # Process Voice Input
     if voice_file is not None:
         audio_bytes = voice_file.getvalue()
         audio_hash = str(hash(audio_bytes))
@@ -183,7 +168,6 @@ with st.sidebar:
         save_permanent_memory([])
         st.rerun()
 
-# 3. Print Logs to screen
 if not st.session_state.messages:
     st.session_state.messages = [{"role": "system", "content": system_prompt}]
 else:
@@ -194,7 +178,6 @@ for msg in st.session_state.messages:
     if msg["role"] == "user":
         st.markdown(f'<div class="chat-bubble-user"><b>You:</b> {msg["content"]}</div>', unsafe_check_html=True)
     elif msg["role"] == "assistant":
-        # Check if the message content looks like a structural widget rather than raw text string
         if msg["content"].startswith("🖼️ IMAGE_GEN:"):
             img_url = msg["content"].replace("🖼️ IMAGE_GEN:", "").strip()
             st.markdown('<div class="chat-bubble-spark"><b>Spark:</b> Your custom visual rendering is ready!</div>', unsafe_check_html=True)
@@ -202,22 +185,17 @@ for msg in st.session_state.messages:
         else:
             st.markdown(f'<div class="chat-bubble-spark"><b>Spark:</b> {msg["content"]}</div>', unsafe_check_html=True)
 
-# 4. Keyboard Prompt Text Capture
 text_box_prompt = st.chat_input("Command your creator studio...")
 if text_box_prompt:
     user_prompt = text_box_prompt
 
-# 5. Core execution logic fork
 if user_prompt or (uploaded_image and creation_intent == "💬 Standard Chat/Vision"):
-    
-    # FORK 1: Direct Image Generation Engine
     if creation_intent == "🎨 Generate AI Image":
         st.markdown(f'<div class="chat-bubble-user"><b>You:</b> [Generate Image] {user_prompt}</div>', unsafe_check_html=True)
         st.session_state.messages.append({"role": "user", "content": f"[Generate Image] {user_prompt}"})
         
-        with st.spinner("🎨 Mixing paints and rendering image pixels..."):
+        with st.spinner("🎨 Mixing paints..."):
             encoded_prompt = urllib.parse.quote(user_prompt)
-            # Fetch high-quality rendering via open-source pollination endpoint architecture
             generated_img_url = f"https://pollinations.ai{encoded_prompt}?width=800&height=600&seed=42&nofeed=true"
             
             st.image(generated_img_url, use_container_width=True)
@@ -225,8 +203,19 @@ if user_prompt or (uploaded_image and creation_intent == "💬 Standard Chat/Vis
             save_permanent_memory(st.session_state.messages)
             st.rerun()
 
-    # FORK 2: Presentation Deck Builder
     elif creation_intent == "📊 Build Presentation Slide":
         st.markdown(f'<div class="chat-bubble-user"><b>You:</b> [Build Slideshow] {user_prompt}</div>', unsafe_check_html=True)
         st.session_state.messages.append({"role": "user", "content": f"[Build Slideshow] {user_prompt}"})
         
+        with st.spinner("📊 Structuring slides..."):
+            slide_generation_instruction = (
+                f"Create a comprehensive informational slideshow text framework outline about '{user_prompt}'. "
+                "You must strictly organize your response text layout using multiple clear sections starting with '### Slide Title' "
+                "followed immediately by 3 to 4 detailed descriptive bullet points underneath it. Keep definitions clear."
+            )
+            try:
+                completion = client.chat.completions.create(
+                    model="openai/gpt-oss-20b",
+                    messages=[{"role": "system", "content": "You are a professional deck designer."}, {"role": "user", "content": slide_generation_instruction}],
+                    temperature=0.6
+                )
