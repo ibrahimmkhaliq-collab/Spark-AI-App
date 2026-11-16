@@ -23,7 +23,7 @@ st.markdown("""
     .chat-bubble-spark { background-color: #fef9c3; padding: 14px; border-radius: 18px; margin: 8px 0; border-left: 6px solid #eab308; }
     .creator-box { background-color: #f0fdf4; padding: 15px; border-radius: 15px; border: 1px solid #bbf7d0; margin: 10px 0; }
     </style>
-    """, unsafe_check_html=True)
+    """, unsafe_allow_html=True)
 
 st.title("⚡ Spark AI: Creator Studio")
 st.caption("AI Studio Engine Connected: Text, Voice, Deep Logic, Vision, Image Generation, & Presentation Building!")
