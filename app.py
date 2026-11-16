@@ -1,16 +1,18 @@
-import streamlit as st
-from groq import Groq
-import json
 import os
+import json
 import base64
 import urllib.parse
+import streamlit as st
+from groq import Groq
 from pptx import Presentation
 from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from streamlit.runtime.scriptrunner import get_script_run_ctx
 
+# 1. Page Configuration Framework Setup
 st.set_page_config(page_title="Spark AI Creator Studio", page_icon="⚡", layout="centered")
 
+# 2. Visual Aesthetic and Layout Design
 st.markdown("""
     <style>
     .main { background-color: #f8fafc; }
@@ -26,6 +28,7 @@ st.markdown("""
 st.title("⚡ Spark AI: Creator Studio")
 st.caption("AI Studio Engine Connected: Text, Voice, Deep Logic, Vision, Image Generation, & Presentation Building!")
 
+# 3. Session and Data Integrity Controls
 def get_user_session_id():
     ctx = get_script_run_ctx()
     return ctx.session_id if ctx is not None else "default_user"
@@ -46,7 +49,7 @@ def load_permanent_memory():
         try:
             with open(MEMORY_FILE, "r") as f:
                 return json.load(f)
-        except:
+        except Exception:
             pass
     return []
 
@@ -54,9 +57,10 @@ def save_permanent_memory(messages):
     with open(MEMORY_FILE, "w") as f:
         json.dump(messages, f, indent=4)
 
+# 4. Core Core PPTX Component Assembly Engine
 def build_powerpoint_presentation(topic, content_str):
     prs = Presentation()
-    slide_layout = prs.slide_layouts[6] 
+    slide_layout = prs.slide_layouts[6]
     slide = prs.slides.add_slide(slide_layout)
     
     background = slide.background
@@ -82,9 +86,7 @@ def build_powerpoint_presentation(topic, content_str):
             continue
         if line.startswith("###") or line.startswith("Slide"):
             if current_bullets:
-                bullet_layout = prs.slide_layouts[6] 
-                s = prs.slides.add_slide(bullet_layout)
-                
+                s = prs.slides.add_slide(prs.slide_layouts[6])
                 t_box = s.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(1))
                 t_p = t_box.text_frame.add_paragraph()
                 t_p.text = current_slide_title
@@ -99,7 +101,6 @@ def build_powerpoint_presentation(topic, content_str):
                     bp.text = f"• {b}"
                     bp.font.size = Pt(18)
                     bp.font.color.rgb = RGBColor(71, 85, 105)
-                
             current_slide_title = line.replace("###", "").replace("Slide:", "").strip()
             current_bullets = []
         else:
@@ -108,8 +109,7 @@ def build_powerpoint_presentation(topic, content_str):
                 current_bullets.append(clean_b[:120]) 
                 
     if current_bullets:
-        bullet_layout = prs.slide_layouts[6]
-        s = prs.slides.add_slide(bullet_layout)
+        s = prs.slides.add_slide(prs.slide_layouts[6])
         t_box = s.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(1))
         t_p = t_box.text_frame.add_paragraph()
         t_p.text = current_slide_title
@@ -129,6 +129,7 @@ def build_powerpoint_presentation(topic, content_str):
     prs.save(output_filename)
     return output_filename
 
+# 5. API Core Connectivity Layer Initialization
 try:
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 except Exception as e:
@@ -138,26 +139,22 @@ except Exception as e:
 if "messages" not in st.session_state:
     st.session_state.messages = load_permanent_memory()
 
+# 6. Sidebar Command Console Implementation
 with st.sidebar:
     st.header("⚙️ Studio Dashboard")
-    
     st.subheader("🛠️ Choose Mode")
     creation_intent = st.radio("What are we creating?", ["💬 Standard Chat/Vision", "🎨 Generate AI Image", "📊 Build Presentation Slide"])
-    
     st.write("---")
     st.subheader("🎭 Personality Shift")
     selected_mood = st.selectbox("Spark's Current Persona:", list(PERSONALITIES.keys()))
     system_prompt = PERSONALITIES[selected_mood]
-    
     st.write("---")
     st.subheader("🧠 Thought Controls")
     reasoning_mode = st.toggle("Engage Deep Reasoning", value=False)
     active_model = "qwen/qwen3.8-27b" if reasoning_mode else "openai/gpt-oss-20b"
-    
     st.write("---")
     st.subheader("🖼️ Vision File Drop")
     uploaded_image = st.file_uploader("Drop image for evaluation:", type=["png", "jpg", "jpeg"])
-    
     st.write("---")
     st.subheader("🎙️ Speech Core Input")
     voice_file = st.audio_input("Record voice")
@@ -171,7 +168,11 @@ with st.sidebar:
             with st.spinner("Transcribing..."):
                 try:
                     voice_file.name = "input.wav"
-                    transcription = client.audio.transcriptions.create(file=voice_file, model="whisper-large-v3-turbo", response_format="text")
+                    transcription = client.audio.transcriptions.create(
+                        file=voice_file, 
+                        model="whisper-large-v3-turbo", 
+                        response_format="text"
+                    )
                     if transcription.strip():
                         user_prompt = transcription.strip()
                         st.session_state.last_audio_hash = audio_hash
@@ -186,6 +187,7 @@ with st.sidebar:
         save_permanent_memory([])
         st.rerun()
 
+# 7. Realtime Screen State Printing Layout Routine
 if not st.session_state.messages:
     st.session_state.messages = [{"role": "system", "content": system_prompt}]
 else:
@@ -207,22 +209,17 @@ text_box_prompt = st.chat_input("Command your creator studio...")
 if text_box_prompt:
     user_prompt = text_box_prompt
 
+# 8. Execution Pipeline Operations Logic Router
 if user_prompt or (uploaded_image and creation_intent == "💬 Standard Chat/Vision"):
     if creation_intent == "🎨 Generate AI Image":
         st.markdown(f'<div class="chat-bubble-user"><b>You:</b> [Generate Image] {user_prompt}</div>', unsafe_check_html=True)
         st.session_state.messages.append({"role": "user", "content": f"[Generate Image] {user_prompt}"})
-        
         with st.spinner("🎨 Mixing paints..."):
             encoded_prompt = urllib.parse.quote(user_prompt)
             generated_img_url = f"https://pollinations.ai{encoded_prompt}?width=800&height=600&seed=42&nofeed=true"
-            
             st.image(generated_img_url, use_container_width=True)
             st.session_state.messages.append({"role": "assistant", "content": f"🖼️ IMAGE_GEN: {generated_img_url}"})
             save_permanent_memory(st.session_state.messages)
             st.rerun()
 
     elif creation_intent == "📊 Build Presentation Slide":
-        st.markdown(f'<div class="chat-bubble-user"><b>You:</b> [Build Slideshow] {user_prompt}</div>', unsafe_check_html=True)
-        st.session_state.messages.append({"role": "user", "content": f"[Build Slideshow] {user_prompt}"})
-        
-        with st.spinner("📊 Structuring slides..."):
