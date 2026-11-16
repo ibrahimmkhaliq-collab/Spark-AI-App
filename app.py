@@ -107,6 +107,24 @@ def build_powerpoint_presentation(topic, content_str):
             if clean_b:
                 current_bullets.append(clean_b[:120]) 
                 
+    if current_bullets:
+        bullet_layout = prs.slide_layouts[6]
+        s = prs.slides.add_slide(bullet_layout)
+        t_box = s.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(1))
+        t_p = t_box.text_frame.add_paragraph()
+        t_p.text = current_slide_title
+        t_p.font.bold = True
+        t_p.font.size = Pt(28)
+        t_p.font.color.rgb = RGBColor(30, 41, 59)
+        
+        b_box = s.shapes.add_textbox(Inches(0.7), Inches(1.8), Inches(8.5), Inches(4.5))
+        b_tf = b_box.text_frame
+        for b in current_bullets:
+            bp = b_tf.add_paragraph()
+            bp.text = f"• {b}"
+            bp.font.size = Pt(18)
+            bp.font.color.rgb = RGBColor(71, 85, 105)
+
     output_filename = f"spark_presentation_{SESSION_ID}.pptx"
     prs.save(output_filename)
     return output_filename
@@ -209,13 +227,3 @@ if user_prompt or (uploaded_image and creation_intent == "💬 Standard Chat/Vis
         
         with st.spinner("📊 Structuring slides..."):
             slide_generation_instruction = (
-                f"Create a comprehensive informational slideshow text framework outline about '{user_prompt}'. "
-                "You must strictly organize your response text layout using multiple clear sections starting with '### Slide Title' "
-                "followed immediately by 3 to 4 detailed descriptive bullet points underneath it. Keep definitions clear."
-            )
-            try:
-                completion = client.chat.completions.create(
-                    model="openai/gpt-oss-20b",
-                    messages=[{"role": "system", "content": "You are a professional deck designer."}, {"role": "user", "content": slide_generation_instruction}],
-                    temperature=0.6)
-                
