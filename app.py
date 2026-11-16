@@ -226,4 +226,3 @@ if user_prompt or (uploaded_image and creation_intent == "💬 Standard Chat/Vis
         st.session_state.messages.append({"role": "user", "content": f"[Build Slideshow] {user_prompt}"})
         
         with st.spinner("📊 Structuring slides..."):
-            slide_generation_instruction = (
