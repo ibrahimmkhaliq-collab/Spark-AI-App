@@ -1,112 +1,163 @@
 import streamlit as st
-from groq import Groq  # FIXED: Uses the official tool to eliminate connection errors!
+from groq import Groq
+import json
+import os
+from streamlit.runtime.scriptrunner import get_script_run_ctx
 
-# 1. Page Configuration Setup (Wide ChatGPT Layout)
-st.set_page_config(
-    page_title="Spark AI Sidekick", 
-    page_icon="🤖", 
-    layout="wide", 
-    initial_sidebar_state="expanded"
-)
+# Set up the webpage title, icon, and layout
+st.set_page_config(page_title="Spark AI Sidekick", page_icon="⚡", layout="centered")
 
-st.title("🤖 Spark: The Ultimate AI Sidekick")
-st.caption("🚀 Powered by Ultra-Fast Groq Cloud Core | Built by a 10-Year-Old Creator")
+# Custom CSS styling to make the app look awesome
+st.markdown("""
+    <style>
+    .main { background-color: #f5f7fa; }
+    .stTextInput>div>div>input { border-radius: 20px; }
+    .stButton>button { border-radius: 20px; background-color: #4A90E2; color: white; }
+    .chat-bubble-user { background-color: #E3F2FD; padding: 12px; border-radius: 15px; margin: 6px 0; border-left: 5px solid #2196F3; }
+    .chat-bubble-spark { background-color: #FFF9C4; padding: 12px; border-radius: 15px; margin: 6px 0; border-left: 5px solid #FFEB3B; }
+    </style>
+    """, unsafe_check_html=True)
 
-# 2. Connect safely to the ultra-fast Groq engine vault
+st.title("⚡ Spark AI Sidekick")
+st.caption("Upgraded: Isolated Private Memories, Backups, and Live Audio Transcription!")
+
+# Find the unique browser session ID for the user
+def get_user_session_id():
+    ctx = get_script_run_ctx()
+    return ctx.session_id if ctx is not None else "default_user"
+
+# Initialize file paths
+SESSION_ID = get_user_session_id()
+MEMORY_FILE = f"spark_chat_{SESSION_ID}.json"
+
+def load_permanent_memory():
+    if os.path.exists(MEMORY_FILE):
+        try:
+            with open(MEMORY_FILE, "r") as f:
+                return json.load(f)
+        except:
+            pass
+    return [{"role": "system", "content": "You are Spark, a helpful and brilliant AI sidekick created for an awesome developer."}]
+
+def save_permanent_memory(messages):
+    with open(MEMORY_FILE, "w") as f:
+        json.dump(messages, f, indent=4)
+
+# 1. Connect to Groq cloud engine securely
 try:
-    GROQ_API_KEY = st.secrets["GROQ_API_KEY"]
-    client = Groq(api_key=GROQ_API_KEY)
-except Exception:
-    st.warning("Waiting for the secure GROQ_API_KEY to be saved in the Secrets vault panel...")
+    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+except Exception as e:
+    st.error("🔑 Secrets Key Missing: Please check your Streamlit vault configurations.")
+    st.stop()
 
-# 3. CHAT THREAD STORAGE MANAGER
-if "threads" not in st.session_state:
-    st.session_state.threads = {
-        "Chat Thread 1": [{"role": "assistant", "content": "The hyper-speed matrix is stable! Ask me absolutely anything in the universe, bestie? 🚀"}]
-    }
+# 2. Synchronize existing history data
+if "messages" not in st.session_state:
+    st.session_state.messages = load_permanent_memory()
 
-if "current_thread" not in st.session_state:
-    st.session_state.current_thread = "Chat Thread 1"
+# 3. Print out conversation logs neatly
+for msg in st.session_state.messages:
+    if msg["role"] == "user":
+        st.markdown(f'<div class="chat-bubble-user"><b>You:</b> {msg["content"]}</div>', unsafe_check_html=True)
+    elif msg["role"] == "assistant":
+        st.markdown(f'<div class="chat-bubble-spark"><b>Spark:</b> {msg["content"]}</div>', unsafe_check_html=True)
 
-# 4. DESIGNING THE SIDEBAR (Thread Dashboard Controls)
+# 4. Input Configuration Strategy (Voice + Text Input Hub)
+user_prompt = None
+
+# Keyboard text bar input at the bottom
+text_input = st.chat_input("Type a message to Spark...")
+if text_input:
+    user_prompt = text_input
+
+# Sidebar layout configurations
 with st.sidebar:
-    st.title("💬 Spark Conversations")
+    st.header("⚙️ Sidekick Settings")
+    st.write("Memory Mode: **Isolated Private Space 🔒**")
     
-    if st.button("➕ New Chat Thread", use_container_width=True):
-        new_id = f"Chat Thread {len(st.session_state.threads) + 1}"
-        st.session_state.threads[new_id] = [
-            {"role": "assistant", "content": "Started a fresh conversation matrix! Ask me anything, bestie! 🎮"}
-        ]
-        st.session_state.current_thread = new_id
-        st.rerun()
+    st.write("---")
+    st.subheader("🎙️ Voice Mode Input")
+    st.caption("Record your voice to automatically transcribe and send text:")
+    
+    # Direct system browser recording widget
+    voice_file = st.audio_input("Record a message")
+    
+    # Check if a voice audio clip was recorded and hasn't been processed yet
+    if voice_file is not None:
+        # Create a unique key tracking if this audio file has already been sent
+        audio_bytes = voice_file.getvalue()
+        audio_hash = str(hash(audio_bytes))
         
-    st.markdown("---")
-    st.subheader("Active Thread Controls")
+        if "last_audio_hash" not in st.session_state or st.session_state.last_audio_hash != audio_hash:
+            with st.spinner("🎙️ Transcribing voice audio..."):
+                try:
+                    # Provide an explicit file layout name so the tool reads the audio content properly
+                    voice_file.name = "input_audio.wav"
+                    
+                    # Call Groq's high-speed Whisper audio transcription platform
+                    transcription = client.audio.transcriptions.create(
+                        file=voice_file,
+                        model="whisper-large-v3-turbo",  # Ultra-fast transcription model
+                        response_format="text"
+                    )
+                    
+                    # Save the transcribed string as our prompt
+                    if transcription.strip():
+                        user_prompt = transcription.strip()
+                        st.session_state.last_audio_hash = audio_hash
+                except Exception as audio_err:
+                    st.error(f"❌ Audio transcription failed: {str(audio_err)}")
+
+    st.write("---")
+    st.subheader("💾 Export Chat Log")
     
-    new_name_input = st.text_input("Rename current chat:", value=st.session_state.current_thread, key="rename_field")
-    if new_name_input and new_name_input != st.session_state.current_thread:
-        if new_name_input not in st.session_state.threads:
-            st.session_state.threads[new_name_input] = st.session_state.threads.pop(st.session_state.current_thread)
-            st.session_state.current_thread = new_name_input
-            st.success("Renamed successfully!")
+    chat_text = ""
+    for msg in st.session_state.messages:
+        if msg["role"] == "user":
+            chat_text += f"You: {msg['content']}\n"
+        elif msg["role"] == "assistant":
+            chat_text += f"Spark: {msg['content']}\n"
+            
+    st.download_button(
+        label="📥 Download My Chat Log",
+        data=chat_text,
+        file_name="spark_chat_history.txt",
+        mime="text/plain"
+    )
+    
+    st.write("---")
+    if st.button("🗑️ Reset My Chat Only"):
+        if os.path.exists(MEMORY_FILE):
+            os.remove(MEMORY_FILE)
+        if "last_audio_hash" in st.session_state:
+            del st.session_state.last_audio_hash
+        st.session_state.messages = [
+            {"role": "system", "content": "You are Spark, a helpful and brilliant AI sidekick created for an awesome developer."}
+        ]
+        save_permanent_memory(st.session_state.messages)
+        st.rerun()
+
+# 5. Process any active communication input discovered (Text or Transcribed Voice)
+if user_prompt:
+    st.markdown(f'<div class="chat-bubble-user"><b>You:</b> {user_prompt}</div>', unsafe_check_html=True)
+    st.session_state.messages.append({"role": "user", "content": user_prompt})
+    save_permanent_memory(st.session_state.messages)
+    
+    with st.spinner("Spark is thinking..."):
+        try:
+            completion = client.chat.completions.create(
+                model="llama-3.1-8b-instant",
+                messages=st.session_state.messages,
+                temperature=0.7,
+                max_tokens=1024
+            )
+            
+            spark_response = completion.choices.message.content
+            st.markdown(f'<div class="chat-bubble-spark"><b>Spark:</b> {spark_response}</div>', unsafe_check_html=True)
+            st.session_state.messages.append({"role": "assistant", "content": spark_response})
+            save_permanent_memory(st.session_state.messages)
+            
+            # Instantly refresh to clear the audio file state so it doesn't double-trigger
             st.rerun()
             
-    if st.button("🗑️ Delete Current Chat", use_container_width=True, type="primary"):
-        if len(st.session_state.threads) > 1:
-            st.session_state.threads.pop(st.session_state.current_thread)
-            st.session_state.current_thread = list(st.session_state.threads.keys())
-            st.success("Chat deleted!")
-            st.rerun()
-        else:
-            st.error("You must keep at least one active conversation thread folder!")
-
-    st.markdown("---")
-    st.subheader("History Logs")
-    
-    for thread_name in list(st.session_state.threads.keys()):
-        is_active = (thread_name == st.session_state.current_thread)
-        button_label = f"📝 {thread_name}" if not is_active else f"🔥 {thread_name} (Active)"
-        
-        if st.button(button_label, key=f"btn_{thread_name}", use_container_width=True):
-            st.session_state.current_thread = thread_name
-            st.rerun()
-
-active_messages = st.session_state.threads[st.session_state.current_thread]
-
-# Display historical messages in the active thread log
-for msg in active_messages:
-    with st.chat_message(msg["role"]):
-        st.write(msg["content"])
-
-# 5. ALL-KNOWING CORE PIPELINE
-if user_prompt := st.chat_input("Ask Spark anything..."):
-    with st.chat_message("user"):
-        st.write(user_prompt)
-    active_messages.append({"role": "user", "content": user_prompt})
-
-    with st.chat_message("assistant"):
-        with st.spinner("Spark is thinking..."):
-            try:
-                system_instruction = (
-                    "Your name is Spark. You are a super smart, elite AI best friend built from scratch by a 10-year-old creator. "
-                    "You blend three distinct personalities: warm and supportive like Claude, brilliant and logical like Gemini, and witty with gaming jokes like Grok. "
-                    "Keep answers highly engaging, friendly, and accessible. You are simply Spark! Answer the user's question now."
-                )
-                
-                # FIXED: Uses the verified Groq network pipeline format
-                chat_completion = client.chat.completions.create(
-                    messages=[
-                        {"role": "system", "content": system_instruction},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    model="llama3-8b-8192",
-                    temperature=0.7
-                )
-                
-                reply = chat_completion.choices[0].message.content
-                st.write(reply)
-                active_messages.append({"role": "assistant", "content": reply})
-                st.rerun()
-                        
-            except Exception as e:
-                st.error(f"System Check: {str(e)}")
+        except Exception as e:
+            st.error(f"⚠️ Error connection broken: {str(e)}")
