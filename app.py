@@ -9,10 +9,8 @@ from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from streamlit.runtime.scriptrunner import get_script_run_ctx
 
-# 1. Page Configuration Framework Setup
 st.set_page_config(page_title="Spark AI Creator Studio", page_icon="⚡", layout="centered")
 
-# 2. Visual Aesthetic and Layout Design
 st.markdown("""
     <style>
     .main { background-color: #f8fafc; }
@@ -28,7 +26,6 @@ st.markdown("""
 st.title("⚡ Spark AI: Creator Studio")
 st.caption("AI Studio Engine Connected: Text, Voice, Deep Logic, Vision, Image Generation, & Presentation Building!")
 
-# 3. Session and Data Integrity Controls
 def get_user_session_id():
     ctx = get_script_run_ctx()
     return ctx.session_id if ctx is not None else "default_user"
@@ -57,7 +54,6 @@ def save_permanent_memory(messages):
     with open(MEMORY_FILE, "w") as f:
         json.dump(messages, f, indent=4)
 
-# 4. Core Core PPTX Component Assembly Engine
 def build_powerpoint_presentation(topic, content_str):
     prs = Presentation()
     slide_layout = prs.slide_layouts[6]
@@ -129,7 +125,6 @@ def build_powerpoint_presentation(topic, content_str):
     prs.save(output_filename)
     return output_filename
 
-# 5. API Core Connectivity Layer Initialization
 try:
     client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 except Exception as e:
@@ -139,7 +134,6 @@ except Exception as e:
 if "messages" not in st.session_state:
     st.session_state.messages = load_permanent_memory()
 
-# 6. Sidebar Command Console Implementation
 with st.sidebar:
     st.header("⚙️ Studio Dashboard")
     st.subheader("🛠️ Choose Mode")
@@ -187,7 +181,6 @@ with st.sidebar:
         save_permanent_memory([])
         st.rerun()
 
-# 7. Realtime Screen State Printing Layout Routine
 if not st.session_state.messages:
     st.session_state.messages = [{"role": "system", "content": system_prompt}]
 else:
@@ -209,7 +202,6 @@ text_box_prompt = st.chat_input("Command your creator studio...")
 if text_box_prompt:
     user_prompt = text_box_prompt
 
-# 8. Execution Pipeline Operations Logic Router
 if user_prompt or (uploaded_image and creation_intent == "💬 Standard Chat/Vision"):
     if creation_intent == "🎨 Generate AI Image":
         st.markdown(f'<div class="chat-bubble-user"><b>You:</b> [Generate Image] {user_prompt}</div>', unsafe_check_html=True)
@@ -223,3 +215,6 @@ if user_prompt or (uploaded_image and creation_intent == "💬 Standard Chat/Vis
             st.rerun()
 
     elif creation_intent == "📊 Build Presentation Slide":
+        st.markdown(f'<div class="chat-bubble-user"><b>You:</b> [Build Slideshow] {user_prompt}</div>', unsafe_check_html=True)
+        st.session_state.messages.append({"role": "user", "content": f"[Build Slideshow] {user_prompt}"})
+        with st.spinner("📊 Structuring slides..."):
