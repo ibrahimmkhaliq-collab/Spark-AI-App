@@ -34,9 +34,7 @@ PERSONALITIES = {
 # --- MULTI-THREAD SESSION STATE ---
 if "threads" not in st.session_state:
     first_id = str(uuid.uuid4())
-    st.session_state.threads = {
-        first_id: {"title": "New Chat 1", "messages": []}
-    }
+    st.session_state.threads = {first_id: {"title": "New Chat 1", "messages": []}}
     st.session_state.current_thread_id = first_id
 
 if "audio_cache" not in st.session_state:
@@ -44,7 +42,6 @@ if "audio_cache" not in st.session_state:
 if "last_processed_audio" not in st.session_state:
     st.session_state.last_processed_audio = None
 
-# Ensure active thread exists
 if st.session_state.current_thread_id not in st.session_state.threads:
     st.session_state.current_thread_id = next(iter(st.session_state.threads))
 
@@ -123,7 +120,6 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
 # --- SIDEBAR CONTROLS & CHAT THREADS ---
 with st.sidebar:
     st.title("⚡ Spark AI")
-    
     if st.button("➕ New Chat Thread", use_container_width=True, type="primary"):
         create_new_thread()
         st.rerun()
@@ -209,7 +205,6 @@ elif voice_audio is not None:
         user_text = "🎙️ *[Voice Message]*"
 
 if user_text or uploaded_file or audio_bytes_to_send:
-    # Auto-name the thread after your first message
     if len(active_thread["messages"]) == 0 and user_text:
         clean_title = user_text.replace("🎙️ *[Voice Message]*", "Voice Chat").strip()
         active_thread["title"] = (clean_title[:28] + "...") if len(clean_title) > 28 else clean_title
@@ -238,10 +233,7 @@ if user_text or uploaded_file or audio_bytes_to_send:
     active_thread["messages"].append(user_msg)
 
     with st.spinner("Spark is thinking..."):
-        try:
-            reply_msg = get_spark_reply(
-                action_mode,
-                PERSONALITIES[selected_mood],
-                user_text,
-                gemini_contents
-            )
+        reply_msg = get_spark_reply(action_mode, PERSONALITIES[selected_mood], user_text, gemini_contents)
+        active_thread["messages"].append(reply_msg)
+        if auto_read and reply_msg.get("content"):
+            new_idx = len(active_thread["messages"]) - 1
