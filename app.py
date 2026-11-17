@@ -95,7 +95,7 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
             "Return ONLY valid JSON as a list of objects with keys 'title' and 'bullets' (list of strings)."
         )
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.8-flash",
             contents=ppt_prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
