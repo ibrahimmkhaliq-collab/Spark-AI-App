@@ -68,17 +68,13 @@ def text_to_speech(text, msg_index):
 # --- SIDEBAR CONTROLS ---
 with st.sidebar:
     st.title("⚡ Spark AI Controls")
-    
     selected_mood = st.selectbox("Spark's Focus Mode:", list(PERSONALITIES.keys()))
-    
     action_mode = st.radio(
         "Action Mode:",
         ["💬 Smart Chat & Vision", "🎨 Generate AI Image", "📊 Build Presentation Slide"]
     )
-    
     st.divider()
     auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
-    
     if st.button("🗑️ Clear Conversation", use_container_width=True):
         st.session_state.messages = []
         st.session_state.audio_cache = {}
@@ -96,9 +92,7 @@ for idx, msg in enumerate(st.session_state.messages):
             st.image(msg["image"], width=320)
         if msg.get("file_name"):
             st.info(f"📎 Attached file: **{msg['file_name']}**")
-        
         st.markdown(msg["content"])
-        
         if msg.get("pptx_bytes"):
             st.download_button(
                 label="📥 Download PowerPoint (.pptx)",
@@ -107,7 +101,6 @@ for idx, msg in enumerate(st.session_state.messages):
                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 key=f"dl_{idx}"
             )
-            
         if msg["role"] == "assistant" and msg.get("content"):
             col_audio, _ = st.columns([1, 4])
             with col_audio:
@@ -126,7 +119,7 @@ prompt_data = st.chat_input(
     file_type=["png", "jpg", "jpeg", "webp", "pdf", "txt", "csv", "py", "md"]
 )
 
-# --- HANDLE INPUT (EITHER TEXT/FILE OR VOICE) ---
+# --- HANDLE INPUT ---
 user_text = ""
 uploaded_file = None
 audio_bytes_to_send = None
@@ -145,7 +138,6 @@ elif voice_audio is not None:
 if user_text or uploaded_file or audio_bytes_to_send:
     user_msg = {"role": "user", "content": user_text or "Analyze this attachment."}
     gemini_contents = []
-    
     if uploaded_file:
         file_ext = uploaded_file.name.split(".")[-1].lower()
         if file_ext in ["png", "jpg", "jpeg", "webp"]:
@@ -159,7 +151,6 @@ if user_text or uploaded_file or audio_bytes_to_send:
             gemini_contents.append(
                 types.Part.from_bytes(data=file_bytes, mime_type=mime)
             )
-            
     if audio_bytes_to_send:
         gemini_contents.append(
             types.Part.from_bytes(data=audio_bytes_to_send, mime_type="audio/wav")
@@ -181,8 +172,6 @@ if user_text or uploaded_file or audio_bytes_to_send:
         with st.spinner("Spark is thinking..."):
             try:
                 system_instruction = PERSONALITIES[selected_mood]
-                
-                # MODE 1: IMAGE GENERATION
                 if action_mode == "🎨 Generate AI Image":
                     result = client.models.generate_images(
                         model="imagen-3.0-generate-002",
@@ -196,8 +185,6 @@ if user_text or uploaded_file or audio_bytes_to_send:
                         "content": f"Here is your generated image for: **{user_text}**",
                         "image": gen_img
                     })
-
-                # MODE 2: PRESENTATION BUILDER
                 elif action_mode == "📊 Build Presentation Slide":
                     ppt_prompt = (
                         f"Create a 5-slide presentation about: {user_text}. "
@@ -226,8 +213,6 @@ if user_text or uploaded_file or audio_bytes_to_send:
                         "content": summary,
                         "pptx_bytes": pptx_file.getvalue()
                     })
-
-                # MODE 3: SMART CHAT, VISION, FILES & VOICE
                 else:
                     response = client.models.generate_content(
                         model="gemini-2.5-flash",
@@ -238,5 +223,10 @@ if user_text or uploaded_file or audio_bytes_to_send:
                     )
                     reply_text = response.text
                     st.markdown(reply_text)
-                    
                     new_idx = len(st.session_state.messages)
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "content": reply_text
+                    })
+                    if auto_read:
+                        audio_bytes = text_to_speech(reply_text, new_idx)
