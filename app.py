@@ -19,6 +19,7 @@ if not api_key:
     st.stop()
 
 client = genai.Client(api_key=api_key)
+MODEL_ID = "gemini-3.5-flash-lite"
 
 # --- FOCUS MODES (Strict No-Slang Rule) ---
 NO_SLANG_RULE = " Speak clearly, naturally, and respectfully. Never use slang words like bestie, bro, fam, or bestie-style talk."
@@ -95,7 +96,7 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
             "Return ONLY valid JSON as a list of objects with keys 'title' and 'bullets' (list of strings)."
         )
         response = client.models.generate_content(
-            model="gemini-3.8-flash",
+            model=MODEL_ID,
             contents=ppt_prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
@@ -111,7 +112,7 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
         }
 
     response = client.models.generate_content(
-        model="gemini-2.5-flash",
+        model=MODEL_ID,
         contents=gemini_contents,
         config=types.GenerateContentConfig(system_instruction=system_instruction)
     )
