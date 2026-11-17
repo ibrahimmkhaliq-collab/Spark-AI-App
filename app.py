@@ -180,6 +180,26 @@ for idx, msg in enumerate(active_thread["messages"]):
 
 # --- VOICE & TEXT INPUTS ---
 st.divider()
+voice_audio = st.audio_input("🎙️ Voice Chat (Record a message to send automatically)")
+
+prompt_data = st.chat_input(
+    "Message Spark, or click + to attach images & files...",
+    accept_file=True,
+    file_type=["png", "jpg", "jpeg", "webp", "pdf", "txt", "csv", "py", "md"]
+)
+
+# --- PROCESS NEW INPUT ---
+user_text = ""
+uploaded_file = None
+audio_bytes_to_send = None
+
+if prompt_data:
+    user_text = prompt_data.text
+    if prompt_data.files:
+        uploaded_file = prompt_data.files[0]
+elif voice_audio is not None:
+    raw_audio = voice_audio.getvalue()
+    if raw_audio != st.session_state.last_processed_audio:
         st.session_state.last_processed_audio = raw_audio
         audio_bytes_to_send = raw_audio
         user_text = "🎙️ *[Voice Message]*"
@@ -217,7 +237,3 @@ if user_text or uploaded_file or audio_bytes_to_send:
         active_thread["messages"].append(reply_msg)
         if auto_read and reply_msg.get("content"):
             new_idx = len(active_thread["messages"]) - 1
-            cache_key = f"{st.session_state.current_thread_id}_{new_idx}"
-            audio_bytes = text_to_speech(reply_msg["content"], cache_key)
-            st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-        st.rerun()
