@@ -138,6 +138,16 @@ with st.sidebar:
         st.session_state.current_thread_id = selected_thread_id
         st.rerun()
 
+    # Rename Current Thread Box
+    new_title = st.text_input(
+        "✏️ Rename current chat:",
+        value=active_thread["title"],
+        key=f"rename_{st.session_state.current_thread_id}"
+    )
+    if new_title and new_title != active_thread["title"]:
+        active_thread["title"] = new_title
+        st.rerun()
+
     if len(st.session_state.threads) > 1:
         if st.button("🗑️ Delete Current Thread", use_container_width=True):
             del st.session_state.threads[st.session_state.current_thread_id]
@@ -232,9 +242,3 @@ if user_text or uploaded_file or audio_bytes_to_send:
         gemini_contents.append(user_text)
 
     active_thread["messages"].append(user_msg)
-
-    with st.spinner("Spark is thinking..."):
-        reply_msg = get_spark_reply(action_mode, PERSONALITIES[selected_mood], user_text, gemini_contents)
-        active_thread["messages"].append(reply_msg)
-        if auto_read and reply_msg.get("content"):
-            new_idx = len(active_thread["messages"]) - 1
