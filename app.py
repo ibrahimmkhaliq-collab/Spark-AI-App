@@ -465,3 +465,83 @@ for idx, msg in enumerate(active_thread["messages"]):
                 st.audio(audio_bytes, format="audio/mp3", autoplay=True)
 
 # --- ATTACHMENTS & VOICE EXPANDER ---
+# --- ATTACHMENTS & VOICE EXPANDER ---
+with st.expander("📎 Attach Image / File or 🎙️ Record Voice", expanded=False):
+    col1, col2 = st.columns(2)
+    with col1:
+        uploaded_file = st.file_uploader(
+            "Upload Image or Document",
+            type=["png", "jpg", "jpeg", "webp", "pdf", "txt", "csv", "py", "md"]
+        )
+    with col2:
+        voice_audio = st.audio_input("Record Voice Message") if hasattr(st, "audio_input") else None
+
+# --- MAIN CHATBOX ---
+user_prompt = st.chat_input("Message Spark AI...")
+
+# --- PROCESS VOICE OR TEXT/FILE INPUT ---
+user_text = ""
+gemini_contents = []
+user_msg_record = {"role": "user", "content": ""}
+triggered = False
+
+if voice_audio is not None:
+    audio_bytes = voice_audio.getvalue()
+    if audio_bytes != st.session_state.last_processed_audio:
+        st.session_state.last_processed_audio = audio_bytes
+        triggered = True
+        user_text = "Voice message"
+        user_msg_record["content"] = "🎙️ *(Voice Message)*"
+        gemini_contents.append(
+            types.Part.from_bytes(data=audio_bytes, mime_type="audio/wav")
+        )
+
+elif user_prompt:
+    triggered = True
+    user_text = user_prompt
+    user_msg_record["content"] = user_text
+
+    if uploaded_file is not None:
+        user_msg_record["file_name"] = uploaded_file.name
+        file_bytes = uploaded_file.getvalue()
+
+        if uploaded_file.type.startswith("image/"):
+            img = Image.open(io.BytesIO(file_bytes))
+            user_msg_record["image"] = img
+            gemini_contents.append(img)
+        else:
+            gemini_contents.append(
+                types.Part.from_bytes(
+                    data=file_bytes,
+                    mime_type=uploaded_file.type or "application/pdf"
+                )
+            )
+
+    gemini_contents.append(user_text)
+
+# --- EXECUTE GEMINI CALL & SAVE ---
+if triggered:
+    active_thread["messages"].append(user_msg_record)
+    if active_thread["title"].startswith("New Chat ") and user_text:
+        active_thread["title"] = user_text[:30] + ("..." if len(user_text) > 30 else "")
+
+    with st.spinner("⚡ Spark is thinking..."):
+        try:
+            reply_msg = get_spark_reply(
+                action_mode=action_mode,
+                system_instruction=PERSONALITIES[selected_mood],
+                user_text=user_text,
+                gemini_contents=gemini_contents
+            )
+            active_thread["messages"].append(reply_msg)
+            save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
+
+            if auto_read and reply_msg.get("content"):
+                new_idx = len(active_thread["messages"]) - 1
+                cache_key = f"{st.session_state.current_thread_id}_{new_idx}"
+                audio_out = text_to_speech(reply_msg["content"], cache_key)
+                st.audio(audio_out, format="audio/mp3", autoplay=True)
+
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error: {e}")
