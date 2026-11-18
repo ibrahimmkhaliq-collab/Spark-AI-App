@@ -506,7 +506,7 @@ with st.sidebar:
             st.session_state.current_thread_id = next(iter(st.session_state.threads))
             st.rerun()
 
-       st.divider()
+    st.divider()
     selected_mood = st.selectbox("Spark's Focus Mode:", list(PERSONALITIES.keys()))
     action_mode = st.radio("Action Mode:", ["💬 Smart Chat & Vision", "🎨 Generate AI Image", "📊 Build Presentation Slide"])
     st.divider()
