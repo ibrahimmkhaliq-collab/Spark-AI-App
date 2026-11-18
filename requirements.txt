@@ -1,7 +1,6 @@
-streamlit
+streamlit>=1.43.0
 google-genai
 supabase
 pillow
-requests
-python-dotenv
-pypdf
+python-pptx
+gTTS
