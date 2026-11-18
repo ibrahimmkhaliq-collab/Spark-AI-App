@@ -257,7 +257,8 @@ if not st.session_state.user_email:
 
         with auth_tab3:
             st.info("Try Spark AI without saving threads to the cloud.")
-            if st.button("Continue as Guest", use_container_width=True):                st.session_state.user_email = "guest@local"
+            if st.button("Continue as Guest", use_container_width=True):
+                st.session_state.user_email = "guest@local"
                 st.rerun()
     st.stop()
 
