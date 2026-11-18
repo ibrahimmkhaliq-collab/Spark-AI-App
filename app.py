@@ -23,7 +23,7 @@ client = genai.Client(api_key=api_key)
 MODEL_ID = "gemini-3.5-flash-lite"
 
 # Initialize Supabase (optional fallback to session state if keys aren't set yet)
-supabase: Client | None = None
+supabase = None
 supa_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
 supa_key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
 if supa_url and supa_key:
@@ -65,7 +65,6 @@ def save_thread_to_supabase(thread_id, thread_data):
     if not supabase:
         return
     try:
-        # Strip binary image/pptx objects before serializing text history to JSON
         serializable_msgs = []
         for m in thread_data["messages"]:
             clean_m = {"role": m["role"], "content": m.get("content", "")}
@@ -251,3 +250,5 @@ for idx, msg in enumerate(active_thread["messages"]):
                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 key=f"dl_{st.session_state.current_thread_id}_{idx}"
             )
+        if msg["role"] == "assistant" and msg.get("content"):
+            cache_key = f"{st.session_state.current_thread_id}_{idx}"
