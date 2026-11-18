@@ -510,8 +510,7 @@ with st.sidebar:
     selected_mood = st.selectbox("Spark's Focus Mode:", list(PERSONALITIES.keys()))
     action_mode = st.radio(
         "Action Mode:",
-        ["💬 Smart Chat & Vision", "🎨 Generate AI Image", "📊 Build Presentation Slide"]
-    )    st.divider()
+        ["💬 Smart Chat & Vision", "🎨 Generate AI Image"    st.divider()
     auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
 
 # --- MAIN HEADER ---
