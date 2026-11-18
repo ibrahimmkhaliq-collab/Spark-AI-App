@@ -9,6 +9,7 @@ import io
 import json
 import os
 import uuid
+import time
 
 # --- PAGE SETUP ---
 st.set_page_config(page_title="Spark AI", page_icon="⚡", layout="wide")
@@ -146,7 +147,7 @@ if not api_key:
     st.stop()
 
 client = genai.Client(api_key=api_key)
-MODEL_ID = "gemini-3.5-flash"
+FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"]
 
 supabase = None
 supa_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
@@ -346,6 +347,24 @@ def text_to_speech(text, cache_key):
         st.session_state.audio_cache[cache_key] = fp.getvalue()
     return st.session_state.audio_cache[cache_key]
 
+def generate_with_fallback(contents, config):
+    last_error = None
+    for model_name in FALLBACK_MODELS:
+        try:
+            return client.models.generate_content(
+                model=model_name,
+                contents=contents,
+                config=config,
+            )
+        except Exception as e:
+            last_error = e
+            err_str = str(e)
+            if "503" in err_str or "429" in err_str or "UNAVAILABLE" in err_str or "NOT_FOUND" in err_str:
+                time.sleep(0.5)
+                continue
+            raise e
+    raise last_error
+
 def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents):
     if action_mode == "🎨 Generate AI Image":
         result = client.models.generate_images(
@@ -361,8 +380,7 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
             f"Create a 5-slide presentation about: {user_text}. "
             "Return ONLY valid JSON as a list of objects with keys 'title' and 'bullets' (list of strings)."
         )
-        response = client.models.generate_content(
-            model=MODEL_ID,
+        response = generate_with_fallback(
             contents=ppt_prompt,
             config=types.GenerateContentConfig(
                 system_instruction=system_instruction,
@@ -377,8 +395,7 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
             "pptx_bytes": pptx_file.getvalue()
         }
 
-    response = client.models.generate_content(
-        model=MODEL_ID,
+    response = generate_with_fallback(
         contents=gemini_contents,
         config=types.GenerateContentConfig(system_instruction=system_instruction)
     )
@@ -554,3 +571,4 @@ if triggered:
             st.rerun()
         except Exception as e:
             st.error(f"Error: {e}")
+            
