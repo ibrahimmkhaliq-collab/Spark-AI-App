@@ -9,7 +9,6 @@ import io
 import json
 import os
 import uuid
-import time
 
 # --- PAGE SETUP ---
 st.set_page_config(page_title="Spark AI", page_icon="⚡", layout="wide")
@@ -159,17 +158,18 @@ PREFERRED_MODELS = [
 
 @st.cache_data(ttl=3600)
 def get_available_chat_models():
+    blocked = ("image", "tts", "live", "embed", "aqa", "vision", "pro", "research", "computer", "robotics", "thinking")
     try:
         available = [
             m.name.removeprefix("models/")
             for m in client.models.list()
-            if "gemini" in m.name and "image" not in m.name and "tts" not in m.name and "live" not in m.name
+            if "gemini" in m.name and not any(b in m.name.lower() for b in blocked)
         ]
         ordered = [m for m in PREFERRED_MODELS if m in available]
         others = [m for m in available if m not in ordered]
-        return ordered + others if (ordered or others) else PREFERRED_MODELS
+        return (ordered + others)[:4] if (ordered or others) else PREFERRED_MODELS[:3]
     except Exception:
-        return PREFERRED_MODELS
+        return PREFERRED_MODELS[:3]
 
 supabase = None
 supa_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
@@ -347,12 +347,12 @@ def create_new_thread():
 def generate_pptx(slides_data):
     prs = Presentation()
     for slide_info in slides_data:
-        slide = prs.slides.add_slide(prs.slide_layouts[1])
+        slide = prs.slides.add_slide(prs.slide_layouts)
         slide.shapes.title.text = slide_info.get("title", "Slide")
-        body = slide.placeholders[1].text_frame
+        body = slide.placeholders.text_frame
         body.clear()
         for idx, point in enumerate(slide_info.get("bullets", [])):
-            p = body.paragraphs[0] if idx == 0 else body.add_paragraph()
+            p = body.paragraphs if idx == 0 else body.add_paragraph()
             p.text = point
     buf = io.BytesIO()
     prs.save(buf)
@@ -370,19 +370,25 @@ def text_to_speech(text, cache_key):
     return st.session_state.audio_cache[cache_key]
 
 def generate_with_fallback(contents, config):
+    models_to_try = get_available_chat_models()
+    if st.session_state.get("working_model") in models_to_try:
+        wm = st.session_state["working_model"]
+        models_to_try = [wm] + [m for m in models_to_try if m != wm]
+
     last_error = None
-    for model_name in get_available_chat_models():
+    for model_name in models_to_try:
         try:
-            return client.models.generate_content(
+            res = client.models.generate_content(
                 model=model_name,
                 contents=contents,
                 config=config,
             )
+            st.session_state["working_model"] = model_name
+            return res
         except Exception as e:
             last_error = e
             err_str = str(e)
-            if any(code in err_str for code in ["503", "429", "404", "UNAVAILABLE", "NOT_FOUND"]):
-                time.sleep(0.3)
+            if any(code in err_str for code in ["503", "429", "404", "400", "UNAVAILABLE", "NOT_FOUND"]):
                 continue
             raise e
     raise last_error
@@ -396,7 +402,7 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
                     contents=user_text or "A futuristic glowing spark",
                     config=types.GenerateContentConfig(response_modalities=["IMAGE"]),
                 )
-                for part in res.candidates[0].content.parts:
+                for part in res.candidates.content.parts:
                     if part.inline_data:
                         gen_img = Image.open(io.BytesIO(part.inline_data.data))
                         return {
@@ -497,7 +503,6 @@ with st.sidebar:
         ["💬 Smart Chat & Vision", "🎨 Generate AI Image", "📊 Build Presentation Slide"]
     )
     st.divider()
-    auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
 # --- MAIN HEADER ---
 st.title(f"⚡ {active_thread['title']}")
 st.caption(f"Current Mode: **{selected_mood}** | **{action_mode}**")
