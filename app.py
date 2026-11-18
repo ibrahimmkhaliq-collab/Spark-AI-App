@@ -1,6 +1,7 @@
 import streamlit as st
 from google import genai
 from google.genai import types
+from supabase import create_client, Client
 from PIL import Image
 from pptx import Presentation
 from gtts import gTTS
@@ -12,7 +13,7 @@ import uuid
 # --- PAGE SETUP ---
 st.set_page_config(page_title="Spark AI", page_icon="⚡", layout="wide")
 
-# --- API SETUP ---
+# --- API & SUPABASE SETUP ---
 api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not api_key:
     st.error("⚠️ Missing GEMINI_API_KEY! Please add it in your Streamlit Cloud Secrets.")
@@ -20,6 +21,16 @@ if not api_key:
 
 client = genai.Client(api_key=api_key)
 MODEL_ID = "gemini-3.5-flash-lite"
+
+# Initialize Supabase (optional fallback to session state if keys aren't set yet)
+supabase: Client | None = None
+supa_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
+supa_key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
+if supa_url and supa_key:
+    try:
+        supabase = create_client(supa_url, supa_key)
+    except Exception:
+        supabase = None
 
 # --- FOCUS MODES (Strict No-Slang Rule) ---
 NO_SLANG_RULE = " Speak clearly, naturally, and respectfully. Never use slang words like bestie, bro, fam, or bestie-style talk."
@@ -32,11 +43,62 @@ PERSONALITIES = {
     "🃏 Clever Humor": "You are Spark, a clever companion. Use smart analogies and light humor." + NO_SLANG_RULE
 }
 
+# --- SUPABASE SYNC HELPERS ---
+def load_threads_from_supabase():
+    if not supabase:
+        return None
+    try:
+        res = supabase.table("spark_threads").select("*").order("updated_at").execute()
+        if res.data:
+            loaded = {}
+            for row in res.data:
+                loaded[row["thread_id"]] = {
+                    "title": row["title"],
+                    "messages": json.loads(row["messages_json"])
+                }
+            return loaded
+    except Exception:
+        return None
+    return None
+
+def save_thread_to_supabase(thread_id, thread_data):
+    if not supabase:
+        return
+    try:
+        # Strip binary image/pptx objects before serializing text history to JSON
+        serializable_msgs = []
+        for m in thread_data["messages"]:
+            clean_m = {"role": m["role"], "content": m.get("content", "")}
+            if m.get("file_name"):
+                clean_m["file_name"] = m["file_name"]
+            serializable_msgs.append(clean_m)
+
+        supabase.table("spark_threads").upsert({
+            "thread_id": thread_id,
+            "title": thread_data["title"],
+            "messages_json": json.dumps(serializable_msgs)
+        }).execute()
+    except Exception:
+        pass
+
+def delete_thread_from_supabase(thread_id):
+    if not supabase:
+        return
+    try:
+        supabase.table("spark_threads").delete().eq("thread_id", thread_id).execute()
+    except Exception:
+        pass
+
 # --- MULTI-THREAD SESSION STATE ---
 if "threads" not in st.session_state:
-    first_id = str(uuid.uuid4())
-    st.session_state.threads = {first_id: {"title": "New Chat 1", "messages": []}}
-    st.session_state.current_thread_id = first_id
+    saved_threads = load_threads_from_supabase()
+    if saved_threads:
+        st.session_state.threads = saved_threads
+        st.session_state.current_thread_id = next(iter(saved_threads))
+    else:
+        first_id = str(uuid.uuid4())
+        st.session_state.threads = {first_id: {"title": "New Chat 1", "messages": []}}
+        st.session_state.current_thread_id = first_id
 
 if "audio_cache" not in st.session_state:
     st.session_state.audio_cache = {}
@@ -54,6 +116,7 @@ def create_new_thread():
     chat_num = len(st.session_state.threads) + 1
     st.session_state.threads[new_id] = {"title": f"New Chat {chat_num}", "messages": []}
     st.session_state.current_thread_id = new_id
+    save_thread_to_supabase(new_id, st.session_state.threads[new_id])
 
 def generate_pptx(slides_data):
     prs = Presentation()
@@ -146,11 +209,14 @@ with st.sidebar:
     )
     if new_title and new_title != active_thread["title"]:
         active_thread["title"] = new_title
+        save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
         st.rerun()
 
     if len(st.session_state.threads) > 1:
         if st.button("🗑️ Delete Current Thread", use_container_width=True):
-            del st.session_state.threads[st.session_state.current_thread_id]
+            del_id = st.session_state.current_thread_id
+            del st.session_state.threads[del_id]
+            delete_thread_from_supabase(del_id)
             st.session_state.current_thread_id = next(iter(st.session_state.threads))
             st.rerun()
 
@@ -162,6 +228,8 @@ with st.sidebar:
     )
     st.divider()
     auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
+    if supabase:
+        st.caption("☁️ Supabase Cloud Sync: **Connected**")
 
 # --- MAIN HEADER ---
 st.title(f"⚡ {active_thread['title']}")
@@ -183,62 +251,3 @@ for idx, msg in enumerate(active_thread["messages"]):
                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 key=f"dl_{st.session_state.current_thread_id}_{idx}"
             )
-        if msg["role"] == "assistant" and msg.get("content"):
-            cache_key = f"{st.session_state.current_thread_id}_{idx}"
-            if st.button("🔊 Read Aloud", key=f"tts_{cache_key}"):
-                audio_bytes = text_to_speech(msg["content"], cache_key)
-                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-
-# --- VOICE & TEXT INPUTS ---
-st.divider()
-voice_audio = st.audio_input("🎙️ Voice Chat (Record a message to send automatically)")
-
-prompt_data = st.chat_input(
-    "Message Spark, or click + to attach images & files...",
-    accept_file=True,
-    file_type=["png", "jpg", "jpeg", "webp", "pdf", "txt", "csv", "py", "md"]
-)
-
-# --- PROCESS NEW INPUT ---
-user_text = ""
-uploaded_file = None
-audio_bytes_to_send = None
-
-if prompt_data:
-    user_text = prompt_data.text
-    if prompt_data.files:
-        uploaded_file = prompt_data.files[0]
-elif voice_audio is not None:
-    raw_audio = voice_audio.getvalue()
-    if raw_audio != st.session_state.last_processed_audio:
-        st.session_state.last_processed_audio = raw_audio
-        audio_bytes_to_send = raw_audio
-        user_text = "🎙️ *[Voice Message]*"
-
-if user_text or uploaded_file or audio_bytes_to_send:
-    if len(active_thread["messages"]) == 0 and user_text:
-        clean_title = user_text.replace("🎙️ *[Voice Message]*", "Voice Chat").strip()
-        active_thread["title"] = (clean_title[:28] + "...") if len(clean_title) > 28 else clean_title
-
-    user_msg = {"role": "user", "content": user_text or "Analyze this attachment."}
-    gemini_contents = []
-
-    if uploaded_file:
-        file_ext = uploaded_file.name.split(".")[-1].lower()
-        if file_ext in ["png", "jpg", "jpeg", "webp"]:
-            img = Image.open(uploaded_file)
-            user_msg["image"] = img
-            gemini_contents.append(img)
-        else:
-            user_msg["file_name"] = uploaded_file.name
-            file_bytes = uploaded_file.getvalue()
-            mime = "application/pdf" if file_ext == "pdf" else "text/plain"
-            gemini_contents.append(types.Part.from_bytes(data=file_bytes, mime_type=mime))
-
-    if audio_bytes_to_send:
-        gemini_contents.append(types.Part.from_bytes(data=audio_bytes_to_send, mime_type="audio/wav"))
-        gemini_contents.append("Listen to the user's voice message and respond directly to what they asked.")
-    elif user_text:
-        gemini_contents.append(user_text)
-
-    active_thread["messages"].append(user_msg)
