@@ -1,7 +1,7 @@
 import streamlit as st
 from google import genai
 from google.genai import types
-from supabase import create_client, Client
+from supabase import create_client
 from PIL import Image
 from pptx import Presentation
 from gtts import gTTS
@@ -20,7 +20,7 @@ if not api_key:
     st.stop()
 
 client = genai.Client(api_key=api_key)
-MODEL_ID = "gemini-3.5-flash-lite"
+MODEL_ID = "gemini-2.5-flash"
 
 # Initialize Supabase (optional fallback to session state if keys aren't set yet)
 supabase = None
@@ -200,7 +200,6 @@ with st.sidebar:
         st.session_state.current_thread_id = selected_thread_id
         st.rerun()
 
-    # Rename Current Thread Box
     new_title = st.text_input(
         "✏️ Rename current chat:",
         value=active_thread["title"],
