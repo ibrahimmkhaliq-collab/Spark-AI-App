@@ -13,6 +13,40 @@ import uuid
 # --- PAGE SETUP ---
 st.set_page_config(page_title="Spark AI", page_icon="⚡", layout="wide")
 
+# --- CUSTOM ELECTRIC THEME CSS ---
+st.markdown("""
+<style>
+    .stApp {
+        background: radial-gradient(circle at top right, #111827, #090d16 70%);
+        color: #f3f4f6;
+    }
+    section[data-testid="stSidebar"] {
+        background-color: #0d1320;
+        border-right: 1px solid #1f2937;
+    }
+    h1, h2, h3 {
+        background: linear-gradient(90deg, #38bdf8, #facc15);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    div.stButton > button[kind="primary"] {
+        background: linear-gradient(90deg, #0284c7, #2563eb);
+        color: white;
+        border: none;
+        border-radius: 10px;
+        font-weight: 600;
+        box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
+    }
+    div[data-testid="stChatMessage"] {
+        background-color: rgba(30, 41, 59, 0.55);
+        border: 1px solid rgba(56, 189, 248, 0.15);
+        border-radius: 14px;
+        padding: 12px 16px;
+        margin-bottom: 10px;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # --- API & SUPABASE SETUP ---
 api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
 if not api_key:
@@ -31,6 +65,56 @@ if supa_url and supa_key:
     except Exception:
         supabase = None
 
+# --- AUTHENTICATION GATE ---
+if "user_email" not in st.session_state:
+    st.session_state.user_email = None
+
+if not st.session_state.user_email:
+    col_l, col_mid, col_r = st.columns([1, 1.4, 1])
+    with col_mid:
+        st.title("⚡ Welcome to Spark AI")
+        st.caption("Sign in to access your private AI workspace & synced chat threads.")
+        auth_tab1, auth_tab2, auth_tab3 = st.tabs(["🔐 Sign In", "✨ Create Account", "🚀 Guest Mode"])
+
+        with auth_tab1:
+            login_email = st.text_input("Email", key="login_email")
+            login_pass = st.text_input("Password", type="password", key="login_pass")
+            if st.button("Sign In", type="primary", use_container_width=True):
+                if not supabase:
+                    st.error("Supabase keys are missing in Secrets.")
+                elif login_email and login_pass:
+                    try:
+                        res = supabase.auth.sign_in_with_password({"email": login_email, "password": login_pass})
+                        st.session_state.user_email = res.user.email
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Login failed: {e}")
+
+        with auth_tab2:
+            reg_email = st.text_input("Email", key="reg_email")
+            reg_pass = st.text_input("Password (min 6 chars)", type="password", key="reg_pass")
+            if st.button("Create Account", type="primary", use_container_width=True):
+                if not supabase:
+                    st.error("Supabase keys are missing in Secrets.")
+                elif reg_email and len(reg_pass) >= 6:
+                    try:
+                        res = supabase.auth.sign_up({"email": reg_email, "password": reg_pass})
+                        if res.user:
+                            st.session_state.user_email = res.user.email
+                            st.success("Account created! Loading Spark AI...")
+                            st.rerun()
+                    except Exception as e:
+                        st.error(f"Sign up failed: {e}")
+                else:
+                    st.warning("Enter a valid email and a password with at least 6 characters.")
+
+        with auth_tab3:
+            st.info("Try Spark AI without saving threads to the cloud.")
+            if st.button("Continue as Guest", use_container_width=True):
+                st.session_state.user_email = "guest@local"
+                st.rerun()
+    st.stop()
+
 # --- FOCUS MODES ---
 NO_SLANG_RULE = " Speak clearly, naturally, and respectfully. Never use slang words like bestie, bro, fam, or bestie-style talk."
 
@@ -42,12 +126,18 @@ PERSONALITIES = {
     "🃏 Clever Humor": "You are Spark, a clever companion. Use smart analogies and light humor." + NO_SLANG_RULE
 }
 
-# --- SUPABASE SYNC HELPERS ---
+# --- USER-SCOPED SUPABASE SYNC HELPERS ---
 def load_threads_from_supabase():
-    if not supabase:
+    if not supabase or st.session_state.user_email == "guest@local":
         return None
     try:
-        res = supabase.table("spark_threads").select("*").order("updated_at").execute()
+        res = (
+            supabase.table("spark_threads")
+            .select("*")
+            .eq("user_email", st.session_state.user_email)
+            .order("updated_at")
+            .execute()
+        )
         if res.data:
             loaded = {}
             for row in res.data:
@@ -61,7 +151,7 @@ def load_threads_from_supabase():
     return None
 
 def save_thread_to_supabase(thread_id, thread_data):
-    if not supabase:
+    if not supabase or st.session_state.user_email == "guest@local":
         return
     try:
         serializable_msgs = []
@@ -73,14 +163,14 @@ def save_thread_to_supabase(thread_id, thread_data):
 
         supabase.table("spark_threads").upsert({
             "thread_id": thread_id,
+            "user_email": st.session_state.user_email,
             "title": thread_data["title"],
             "messages_json": json.dumps(serializable_msgs)
         }).execute()
     except Exception:
         pass
-
 def delete_thread_from_supabase(thread_id):
-    if not supabase:
+    if not supabase or st.session_state.user_email == "guest@local":
         return
     try:
         supabase.table("spark_threads").delete().eq("thread_id", thread_id).execute()
@@ -182,6 +272,13 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
 # --- SIDEBAR CONTROLS & CHAT THREADS ---
 with st.sidebar:
     st.title("⚡ Spark AI")
+    st.caption(f"👤 Signed in: **{st.session_state.user_email}**")
+    if st.button("🚪 Sign Out", use_container_width=True):
+        st.session_state.user_email = None
+        st.session_state.pop("threads", None)
+        st.rerun()
+
+    st.divider()
     if st.button("➕ New Chat Thread", use_container_width=True, type="primary"):
         create_new_thread()
         st.rerun()
@@ -225,8 +322,6 @@ with st.sidebar:
     )
     st.divider()
     auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
-    if supabase:
-        st.caption("☁️ Supabase Cloud Sync: **Connected**")
 
 # --- MAIN HEADER ---
 st.title(f"⚡ {active_thread['title']}")
@@ -326,12 +421,3 @@ if triggered:
             save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
 
             if auto_read and reply_msg.get("content"):
-                new_idx = len(active_thread["messages"]) - 1
-                cache_key = f"{st.session_state.current_thread_id}_{new_idx}"
-                audio_out = text_to_speech(reply_msg["content"], cache_key)
-                st.audio(audio_out, format="audio/mp3", autoplay=True)
-
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error: {e}")
-            
