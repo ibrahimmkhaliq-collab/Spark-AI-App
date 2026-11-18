@@ -1,13 +1,76 @@
-# ⚡ Spark AI: Ultimate Creator Edition
+# ⚡ Spark AI
 
-Welcome to the **Ultimate Creator Edition of Spark AI Sidekick**! This application is a professional-grade creation engine connected to multi-model cloud infrastructures. 
+**Spark AI** is a full-stack, multi-user AI assistant built with **Streamlit**, **Google Gemini**, and **Supabase**. It features persistent user authentication, cloud-synced multi-thread conversations, 4 switchable UI themes, voice chat, text-to-speech, vision & document Q&A, AI image generation, and automated PowerPoint creation.
 
-## 🚀 Exclusive Creative Features
+---
 
-*   **🎨 AI Image Generator (New):** Type any visual prompt (e.g., "A futuristic cyberpunk city with neon flying cars") and Spark will use advanced diffusion models to generate a brand new image directly inside your chat frame!
-*   **📊 PowerPoint Presentation Builder (New):** Type a request for a presentation topic. Spark will intelligently structure your content, design slides, write bullet points, and instantly build an authentic, editable Microsoft PowerPoint file (`.pptx`) ready for you to download and present!
-*   **🖼️ Multimodal Vision Module:** Built-in image analysis. Drop in any external image (`.png`, `.jpg`, `.jpeg`), and Spark will visually inspect and explain the content.
-*   **🧠 Tunable Thought Processor:** Toggle on "Deep Reasoning Mode" in the sidebar to engage advanced step-by-step thinking protocols for complex logic puzzles.
-*   **🎭 Personality Shift Matrix:** Dynamically switch Spark's operational mode between a **Helpful Sidekick**, an elite **Coding Wizard**, a clear **Strict Logic Teacher**, or a witty **Funny Joker**.
-*   **🎙️ Live Voice Transcription Hub:** Speak directly to Spark! Raw browser microphone streams are cleanly transcribed into text prompts using ultra-fast Whisper APIs.
-*   **🔒 Multi-User Private Sandbox:** Individual browser storage spaces separate every viewer so no conversations or download files get crossed.
+## ✨ Features
+
+* **🔐 User Authentication & Persistent Login:** Secure email/password sign-up and sign-in powered by **Supabase Auth**, with automatic session persistence across page refreshes plus a Guest Mode option.
+* **☁️ Cloud-Synced Multi-Thread Chats:** Create, switch, rename, and delete multiple chat threads—privately saved per user in a **Supabase** PostgreSQL database.
+* **🎨 4 Switchable UI Themes:** Customize your workspace anytime between **Dark UI**, **Dark**, **Light UI**, and **Light** modes.
+* **🧠 5 AI Focus Modes:** Tailor Spark's tone and expertise (*Helpful Sidekick*, *Coding Wizard*, *Strict Logic Teacher*, *Sharp & Direct*, and *Clever Humor*).
+* **👁️ Vision & Document Reader:** Upload images (`PNG`, `JPG`, `WEBP`) or documents (`PDF`, `TXT`, `CSV`, `PY`, `MD`) to analyze, summarize, and ask questions.
+* **🎙️ Voice Chat & Read Aloud (TTS):** Record voice messages directly in the browser and listen to Spark's replies with one-click or automatic **gTTS** audio playback.
+* **🖼️ AI Image Generation:** Generate custom high-resolution images from text prompts using **Imagen 3**.
+* **📊 PowerPoint Slide Builder:** Automatically generate structured 5-slide `.pptx` presentations from any topic and download them instantly.
+
+---
+
+## 🛠️ Tech Stack
+
+* **Frontend & Themes:** [Streamlit](https://streamlit.io) + Custom CSS Theme Engine
+* **AI Models:** [Google GenAI SDK](https://google.dev) (`gemini-2.5-flash` & `imagen-3.0-generate-002`)
+* **Auth & Database:** [Supabase](https://supabase.com) (Supabase Auth + PostgreSQL)
+* **Media & Documents:** `Pillow` (Images), `python-pptx` (Presentations), `gTTS` (Text-to-Speech)
+
+---
+
+## 🚀 Setup & Installation
+
+### 1. Clone the Repository
+```bash
+git clone https://github.com
+cd spark-ai-app
+```
+
+### 2. Install Dependencies
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configure Supabase Database & Auth
+1. Run the following SQL query in your **Supabase SQL Editor**:
+   ```sql
+   create table if not exists spark_threads (
+     thread_id text primary key,
+     user_email text not null,
+     title text not null,
+     messages_json text not null,
+     updated_at timestamp with time zone default now()
+   );
+   ```
+2. *(Optional)* Under **Authentication > Sign In / Providers > Email**, disable **Confirm email** for instant account activation.
+
+### 4. Add API Keys (Secrets)
+Add your credentials in `.streamlit/secrets.toml` (for local runs) or in **Streamlit Community Cloud > Settings > Secrets**:
+```toml
+GEMINI_API_KEY = "your_google_gemini_api_key"
+SUPABASE_URL = "https://supabase.co"
+SUPABASE_KEY = "your_supabase_anon_public_key"
+```
+
+### 5. Run Locally
+```bash
+streamlit run app.py
+```
+
+---
+
+## 📁 Project Structure
+
+```text
+├── app.py              # Main Streamlit application (Auth, Themes, Multi-Thread AI)
+├── requirements.txt    # Python dependencies
+└── README.md           # Project documentation
+```
