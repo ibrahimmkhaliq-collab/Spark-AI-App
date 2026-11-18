@@ -257,7 +257,10 @@ if not st.session_state.user_email:
 
         with auth_tab3:
             st.info("Try Spark AI without saving threads to the cloud.")
-            if st.button("Continue as Guest", use_container_width=True):
+            if st.button("Continue as Guest", use_container_width=True):                st.session_state.user_email = "guest@local"
+                st.rerun()
+    st.stop()
+
 # --- FOCUS MODES ---
 NO_SLANG_RULE = " Speak clearly, naturally, and respectfully. Never use slang words like bestie, bro, fam, or bestie-style talk."
 
