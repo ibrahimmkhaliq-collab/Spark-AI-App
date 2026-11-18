@@ -147,7 +147,29 @@ if not api_key:
     st.stop()
 
 client = genai.Client(api_key=api_key)
-FALLBACK_MODELS = ["gemini-2.5-flash", "gemini-2.5-flash-lite", "gemini-2.0-flash"]
+
+PREFERRED_MODELS = [
+    "gemini-3.8-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-4-hydrogen",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+]
+
+@st.cache_data(ttl=3600)
+def get_available_chat_models():
+    try:
+        available = [
+            m.name.removeprefix("models/")
+            for m in client.models.list()
+            if "gemini" in m.name and "image" not in m.name and "tts" not in m.name and "live" not in m.name
+        ]
+        ordered = [m for m in PREFERRED_MODELS if m in available]
+        others = [m for m in available if m not in ordered]
+        return ordered + others if (ordered or others) else PREFERRED_MODELS
+    except Exception:
+        return PREFERRED_MODELS
 
 supabase = None
 supa_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
@@ -349,7 +371,7 @@ def text_to_speech(text, cache_key):
 
 def generate_with_fallback(contents, config):
     last_error = None
-    for model_name in FALLBACK_MODELS:
+    for model_name in get_available_chat_models():
         try:
             return client.models.generate_content(
                 model=model_name,
@@ -359,21 +381,32 @@ def generate_with_fallback(contents, config):
         except Exception as e:
             last_error = e
             err_str = str(e)
-            if "503" in err_str or "429" in err_str or "UNAVAILABLE" in err_str or "NOT_FOUND" in err_str:
-                time.sleep(0.5)
+            if any(code in err_str for code in ["503", "429", "404", "UNAVAILABLE", "NOT_FOUND"]):
+                time.sleep(0.3)
                 continue
             raise e
     raise last_error
 
 def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents):
     if action_mode == "🎨 Generate AI Image":
-        result = client.models.generate_images(
-            model="imagen-3.0-generate-002",
-            prompt=user_text or "A futuristic glowing spark",
-            config=types.GenerateImagesConfig(number_of_images=1)
-        )
-        gen_img = Image.open(io.BytesIO(result.generated_images[0].image.image_bytes))
-        return {"role": "assistant", "content": f"Here is your generated image for: **{user_text}**", "image": gen_img}
+        for img_model in ["gemini-3.1-flash-image", "gemini-2.5-flash-image"]:
+            try:
+                res = client.models.generate_content(
+                    model=img_model,
+                    contents=user_text or "A futuristic glowing spark",
+                    config=types.GenerateContentConfig(response_modalities=["IMAGE"]),
+                )
+                for part in res.candidates[0].content.parts:
+                    if part.inline_data:
+                        gen_img = Image.open(io.BytesIO(part.inline_data.data))
+                        return {
+                            "role": "assistant",
+                            "content": f"Here is your generated image for: **{user_text}**",
+                            "image": gen_img,
+                        }
+            except Exception:
+                continue
+        raise RuntimeError("Image generation model is currently unavailable for this API key.")
 
     if action_mode == "📊 Build Presentation Slide":
         ppt_prompt = (
@@ -571,4 +604,3 @@ if triggered:
             st.rerun()
         except Exception as e:
             st.error(f"Error: {e}")
-            
