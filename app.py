@@ -421,3 +421,11 @@ if triggered:
             save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
 
             if auto_read and reply_msg.get("content"):
+                new_idx = len(active_thread["messages"]) - 1
+                cache_key = f"{st.session_state.current_thread_id}_{new_idx}"
+                audio_out = text_to_speech(reply_msg["content"], cache_key)
+                st.audio(audio_out, format="audio/mp3", autoplay=True)
+
+            st.rerun()
+        except Exception as e:
+            st.error(f"Error: {e}")
