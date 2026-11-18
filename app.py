@@ -84,7 +84,6 @@ st.markdown(f"""
         background: {t['sidebar']} !important;
         border-right: 1px solid {t['border']} !important;
     }}
-    /* Fix ALL text, labels, radio options, and captions */
     .stApp p, .stApp span, .stApp label, .stApp div,
     section[data-testid="stSidebar"] p,
     section[data-testid="stSidebar"] span,
@@ -100,14 +99,13 @@ st.markdown(f"""
         -webkit-background-clip: text !important;
         -webkit-text-fill-color: transparent !important;
     }}
-    /* Inputs, Textboxes, Selectboxes */
     input, textarea, [data-baseweb="select"] > div, [data-baseweb="input"] > div {{
         background-color: {t['input_bg']} !important;
         color: {t['text']} !important;
         border-color: {t['border']} !important;
     }}
-    /* Buttons */
-    div.stButton > button[kind="primary"] {{
+    div.stButton > button[kind="primary"],
+    div.stButton > button[kind="primary"] p {{
         background: {t['btn_grad']} !important;
         color: {t['btn_text']} !important;
         border: none !important;
@@ -120,13 +118,11 @@ st.markdown(f"""
         border: 1px solid {t['border']} !important;
         border-radius: 10px !important;
     }}
-    /* Chat Messages & Expander */
     div[data-testid="stChatMessage"], [data-testid="stExpander"] {{
         background-color: {t['card']} !important;
         border: 1px solid {t['border']} !important;
         border-radius: 14px !important;
     }}
-    /* Fix Bottom Chatbox Container & Input */
     [data-testid="stBottom"], [data-testid="stBottom"] > div {{
         background: {t['bottom_bg']} !important;
         border-top: 1px solid {t['border']} !important;
@@ -161,9 +157,19 @@ if supa_url and supa_key:
     except Exception:
         supabase = None
 
-# --- AUTHENTICATION GATE ---
+# --- AUTHENTICATION GATE (Stay Signed In) ---
 if "user_email" not in st.session_state:
     st.session_state.user_email = None
+
+if not st.session_state.user_email and supabase and "rt" in st.query_params:
+    try:
+        refreshed = supabase.auth.refresh_session(st.query_params["rt"])
+        if refreshed and refreshed.user:
+            st.session_state.user_email = refreshed.user.email
+            if refreshed.session:
+                st.query_params["rt"] = refreshed.session.refresh_token
+    except Exception:
+        st.query_params.clear()
 
 if not st.session_state.user_email:
     col_l, col_mid, col_r = st.columns([1, 1.4, 1])
@@ -191,6 +197,8 @@ if not st.session_state.user_email:
                     try:
                         res = supabase.auth.sign_in_with_password({"email": login_email, "password": login_pass})
                         st.session_state.user_email = res.user.email
+                        if res.session:
+                            st.query_params["rt"] = res.session.refresh_token
                         st.rerun()
                     except Exception as e:
                         st.error(f"Login failed: {e}")
@@ -206,6 +214,8 @@ if not st.session_state.user_email:
                         res = supabase.auth.sign_up({"email": reg_email, "password": reg_pass})
                         if res.user:
                             st.session_state.user_email = res.user.email
+                            if res.session:
+                                st.query_params["rt"] = res.session.refresh_token
                             st.success("Account created! Loading Spark AI...")
                             st.rerun()
                     except Exception as e:
@@ -381,6 +391,7 @@ with st.sidebar:
     if st.button("🚪 Sign Out", use_container_width=True):
         st.session_state.user_email = None
         st.session_state.pop("threads", None)
+        st.query_params.clear()
         st.rerun()
 
     st.divider()
@@ -437,7 +448,6 @@ with st.sidebar:
     )
     st.divider()
     auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
-
 # --- MAIN HEADER ---
 st.title(f"⚡ {active_thread['title']}")
 st.caption(f"Current Mode: **{selected_mood}** | **{action_mode}**")
@@ -464,7 +474,6 @@ for idx, msg in enumerate(active_thread["messages"]):
                 audio_bytes = text_to_speech(msg["content"], cache_key)
                 st.audio(audio_bytes, format="audio/mp3", autoplay=True)
 
-# --- ATTACHMENTS & VOICE EXPANDER ---
 # --- ATTACHMENTS & VOICE EXPANDER ---
 with st.expander("📎 Attach Image / File or 🎙️ Record Voice", expanded=False):
     col1, col2 = st.columns(2)
