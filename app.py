@@ -146,7 +146,7 @@ if not api_key:
     st.stop()
 
 client = genai.Client(api_key=api_key)
-MODEL_ID = "gemini-2.5-flash"
+MODEL_ID = "gemini-3.5-flash"
 
 supabase = None
 supa_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
