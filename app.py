@@ -127,14 +127,23 @@ st.markdown(f"""
         background: {t['bottom_bg']} !important;
         border-top: 1px solid {t['border']} !important;
     }}
-    [data-testid="stChatInput"] {{
+    [data-testid="stChatInput"],
+    [data-testid="stChatInput"] > div,
+    [data-testid="stChatInput"] > div > div {{
         background-color: {t['input_bg']} !important;
-        border: 1px solid {t['border']} !important;
+        border-color: {t['border']} !important;
         border-radius: 14px !important;
     }}
     [data-testid="stChatInput"] textarea {{
         color: {t['text']} !important;
+        caret-color: {t['text']} !important;
+        -webkit-text-fill-color: {t['text']} !important;
         background-color: transparent !important;
+    }}
+    [data-testid="stChatInput"] textarea::placeholder {{
+        color: {t['muted']} !important;
+        -webkit-text-fill-color: {t['muted']} !important;
+        opacity: 0.75 !important;
     }}
 </style>
 """, unsafe_allow_html=True)
@@ -249,9 +258,6 @@ if not st.session_state.user_email:
         with auth_tab3:
             st.info("Try Spark AI without saving threads to the cloud.")
             if st.button("Continue as Guest", use_container_width=True):
-                st.session_state.user_email = "guest@local"
-                st.rerun()
-    st.stop()
 # --- FOCUS MODES ---
 NO_SLANG_RULE = " Speak clearly, naturally, and respectfully. Never use slang words like bestie, bro, fam, or bestie-style talk."
 
@@ -347,12 +353,12 @@ def create_new_thread():
 def generate_pptx(slides_data):
     prs = Presentation()
     for slide_info in slides_data:
-        slide = prs.slides.add_slide(prs.slide_layouts)
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
         slide.shapes.title.text = slide_info.get("title", "Slide")
-        body = slide.placeholders.text_frame
+        body = slide.placeholders[1].text_frame
         body.clear()
         for idx, point in enumerate(slide_info.get("bullets", [])):
-            p = body.paragraphs if idx == 0 else body.add_paragraph()
+            p = body.paragraphs[0] if idx == 0 else body.add_paragraph()
             p.text = point
     buf = io.BytesIO()
     prs.save(buf)
@@ -402,7 +408,7 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
                     contents=user_text or "A futuristic glowing spark",
                     config=types.GenerateContentConfig(response_modalities=["IMAGE"]),
                 )
-                for part in res.candidates.content.parts:
+                for part in res.candidates[0].content.parts:
                     if part.inline_data:
                         gen_img = Image.open(io.BytesIO(part.inline_data.data))
                         return {
@@ -501,11 +507,7 @@ with st.sidebar:
     action_mode = st.radio(
         "Action Mode:",
         ["💬 Smart Chat & Vision", "🎨 Generate AI Image", "📊 Build Presentation Slide"]
-        )
-    
-    st.divider()
-    auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
-
+    )
 # --- MAIN HEADER ---
 st.title(f"⚡ {active_thread['title']}")
 st.caption(f"Current Mode: **{selected_mood}** | **{action_mode}**")
