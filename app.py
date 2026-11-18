@@ -13,37 +13,133 @@ import uuid
 # --- PAGE SETUP ---
 st.set_page_config(page_title="Spark AI", page_icon="⚡", layout="wide")
 
-# --- CUSTOM ELECTRIC THEME CSS ---
-st.markdown("""
+# --- THEME ENGINE (Dark, Dark UI, Light, Light UI) ---
+if "app_theme" not in st.session_state:
+    st.session_state.app_theme = "🌌 Dark UI"
+
+THEMES = {
+    "🌌 Dark UI": {
+        "bg": "radial-gradient(circle at top right, #111827, #090d16 75%)",
+        "sidebar": "#0d1320",
+        "text": "#f8fafc",
+        "muted": "#cbd5e1",
+        "card": "rgba(30, 41, 59, 0.75)",
+        "border": "rgba(56, 189, 248, 0.28)",
+        "input_bg": "#1e293b",
+        "bottom_bg": "#090d16",
+        "title_grad": "linear-gradient(90deg, #38bdf8, #facc15)",
+        "btn_grad": "linear-gradient(90deg, #0284c7, #2563eb)",
+        "btn_text": "#ffffff",
+    },
+    "🌑 Dark": {
+        "bg": "#121212",
+        "sidebar": "#18181b",
+        "text": "#f4f4f5",
+        "muted": "#d4d4d8",
+        "card": "#1f1f23",
+        "border": "#3f3f46",
+        "input_bg": "#27272a",
+        "bottom_bg": "#121212",
+        "title_grad": "linear-gradient(90deg, #f4f4f5, #a1a1aa)",
+        "btn_grad": "linear-gradient(90deg, #3f3f46, #52525b)",
+        "btn_text": "#ffffff",
+    },
+    "☀️ Light": {
+        "bg": "#ffffff",
+        "sidebar": "#f8fafc",
+        "text": "#0f172a",
+        "muted": "#334155",
+        "card": "#f1f5f9",
+        "border": "#cbd5e1",
+        "input_bg": "#ffffff",
+        "bottom_bg": "#ffffff",
+        "title_grad": "linear-gradient(90deg, #0f172a, #334155)",
+        "btn_grad": "linear-gradient(90deg, #0f172a, #1e293b)",
+        "btn_text": "#ffffff",
+    },
+    "✨ Light UI": {
+        "bg": "linear-gradient(135deg, #f0f9ff 0%, #e0e7ff 50%, #fdf4ff 100%)",
+        "sidebar": "rgba(255, 255, 255, 0.88)",
+        "text": "#0f172a",
+        "muted": "#334155",
+        "card": "rgba(255, 255, 255, 0.85)",
+        "border": "rgba(59, 130, 246, 0.3)",
+        "input_bg": "#ffffff",
+        "bottom_bg": "#eef2ff",
+        "title_grad": "linear-gradient(90deg, #0284c7, #7c3aed)",
+        "btn_grad": "linear-gradient(90deg, #0284c7, #6366f1)",
+        "btn_text": "#ffffff",
+    },
+}
+
+t = THEMES[st.session_state.app_theme]
+
+st.markdown(f"""
 <style>
-    .stApp {
-        background: radial-gradient(circle at top right, #111827, #090d16 70%);
-        color: #f3f4f6;
-    }
-    section[data-testid="stSidebar"] {
-        background-color: #0d1320;
-        border-right: 1px solid #1f2937;
-    }
-    h1, h2, h3 {
-        background: linear-gradient(90deg, #38bdf8, #facc15);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-    }
-    div.stButton > button[kind="primary"] {
-        background: linear-gradient(90deg, #0284c7, #2563eb);
-        color: white;
-        border: none;
-        border-radius: 10px;
-        font-weight: 600;
-        box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4);
-    }
-    div[data-testid="stChatMessage"] {
-        background-color: rgba(30, 41, 59, 0.55);
-        border: 1px solid rgba(56, 189, 248, 0.15);
-        border-radius: 14px;
-        padding: 12px 16px;
-        margin-bottom: 10px;
-    }
+    .stApp, [data-testid="stAppViewContainer"], [data-testid="stHeader"] {{
+        background: {t['bg']} !important;
+        color: {t['text']} !important;
+    }}
+    section[data-testid="stSidebar"] {{
+        background: {t['sidebar']} !important;
+        border-right: 1px solid {t['border']} !important;
+    }}
+    /* Fix ALL text, labels, radio options, and captions */
+    .stApp p, .stApp span, .stApp label, .stApp div,
+    section[data-testid="stSidebar"] p,
+    section[data-testid="stSidebar"] span,
+    section[data-testid="stSidebar"] label,
+    [data-testid="stWidgetLabel"] p {{
+        color: {t['text']} !important;
+    }}
+    [data-testid="stCaptionContainer"] p {{
+        color: {t['muted']} !important;
+    }}
+    h1, h2, h3 {{
+        background: {t['title_grad']} !important;
+        -webkit-background-clip: text !important;
+        -webkit-text-fill-color: transparent !important;
+    }}
+    /* Inputs, Textboxes, Selectboxes */
+    input, textarea, [data-baseweb="select"] > div, [data-baseweb="input"] > div {{
+        background-color: {t['input_bg']} !important;
+        color: {t['text']} !important;
+        border-color: {t['border']} !important;
+    }}
+    /* Buttons */
+    div.stButton > button[kind="primary"] {{
+        background: {t['btn_grad']} !important;
+        color: {t['btn_text']} !important;
+        border: none !important;
+        border-radius: 10px !important;
+        font-weight: 600 !important;
+    }}
+    div.stButton > button[kind="secondary"] {{
+        background-color: {t['card']} !important;
+        color: {t['text']} !important;
+        border: 1px solid {t['border']} !important;
+        border-radius: 10px !important;
+    }}
+    /* Chat Messages & Expander */
+    div[data-testid="stChatMessage"], [data-testid="stExpander"] {{
+        background-color: {t['card']} !important;
+        border: 1px solid {t['border']} !important;
+        border-radius: 14px !important;
+    }}
+    /* Fix Bottom Chatbox Container & Input */
+    [data-testid="stBottom"], [data-testid="stBottom"] > div {{
+        background: {t['bottom_bg']} !important;
+        border-top: 1px solid {t['border']} !important;
+    }}
+    [data-testid="stChatInput"] {{
+        background-color: {t['input_bg']} !important;
+        border: 1px solid {t['border']} !important;
+        border-radius: 14px !important;
+    }}
+    [data-testid="stChatInput"] textarea {{
+        color: {t['text']} !important;
+        background-color: transparent !important;
+    }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -72,6 +168,15 @@ if "user_email" not in st.session_state:
 if not st.session_state.user_email:
     col_l, col_mid, col_r = st.columns([1, 1.4, 1])
     with col_mid:
+        theme_choice = st.selectbox(
+            "🎨 Theme:",
+            list(THEMES.keys()),
+            index=list(THEMES.keys()).index(st.session_state.app_theme),
+        )
+        if theme_choice != st.session_state.app_theme:
+            st.session_state.app_theme = theme_choice
+            st.rerun()
+
         st.title("⚡ Welcome to Spark AI")
         st.caption("Sign in to access your private AI workspace & synced chat threads.")
         auth_tab1, auth_tab2, auth_tab3 = st.tabs(["🔐 Sign In", "✨ Create Account", "🚀 Guest Mode"])
@@ -114,7 +219,6 @@ if not st.session_state.user_email:
                 st.session_state.user_email = "guest@local"
                 st.rerun()
     st.stop()
-
 # --- FOCUS MODES ---
 NO_SLANG_RULE = " Speak clearly, naturally, and respectfully. Never use slang words like bestie, bro, fam, or bestie-style talk."
 
@@ -169,6 +273,7 @@ def save_thread_to_supabase(thread_id, thread_data):
         }).execute()
     except Exception:
         pass
+
 def delete_thread_from_supabase(thread_id):
     if not supabase or st.session_state.user_email == "guest@local":
         return
@@ -279,6 +384,16 @@ with st.sidebar:
         st.rerun()
 
     st.divider()
+    selected_theme = st.selectbox(
+        "🎨 App Theme:",
+        list(THEMES.keys()),
+        index=list(THEMES.keys()).index(st.session_state.app_theme),
+    )
+    if selected_theme != st.session_state.app_theme:
+        st.session_state.app_theme = selected_theme
+        st.rerun()
+
+    st.divider()
     if st.button("➕ New Chat Thread", use_container_width=True, type="primary"):
         create_new_thread()
         st.rerun()
@@ -350,82 +465,3 @@ for idx, msg in enumerate(active_thread["messages"]):
                 st.audio(audio_bytes, format="audio/mp3", autoplay=True)
 
 # --- ATTACHMENTS & VOICE EXPANDER ---
-with st.expander("📎 Attach Image / File or 🎙️ Record Voice", expanded=False):
-    col1, col2 = st.columns(2)
-    with col1:
-        uploaded_file = st.file_uploader(
-            "Upload Image or Document",
-            type=["png", "jpg", "jpeg", "webp", "pdf", "txt", "csv", "py", "md"]
-        )
-    with col2:
-        voice_audio = st.audio_input("Record Voice Message") if hasattr(st, "audio_input") else None
-
-# --- MAIN CHATBOX ---
-user_prompt = st.chat_input("Message Spark AI...")
-
-# --- PROCESS VOICE OR TEXT/FILE INPUT ---
-user_text = ""
-gemini_contents = []
-user_msg_record = {"role": "user", "content": ""}
-triggered = False
-
-if voice_audio is not None:
-    audio_bytes = voice_audio.getvalue()
-    if audio_bytes != st.session_state.last_processed_audio:
-        st.session_state.last_processed_audio = audio_bytes
-        triggered = True
-        user_text = "Voice message"
-        user_msg_record["content"] = "🎙️ *(Voice Message)*"
-        gemini_contents.append(
-            types.Part.from_bytes(data=audio_bytes, mime_type="audio/wav")
-        )
-
-elif user_prompt:
-    triggered = True
-    user_text = user_prompt
-    user_msg_record["content"] = user_text
-
-    if uploaded_file is not None:
-        user_msg_record["file_name"] = uploaded_file.name
-        file_bytes = uploaded_file.getvalue()
-
-        if uploaded_file.type.startswith("image/"):
-            img = Image.open(io.BytesIO(file_bytes))
-            user_msg_record["image"] = img
-            gemini_contents.append(img)
-        else:
-            gemini_contents.append(
-                types.Part.from_bytes(
-                    data=file_bytes,
-                    mime_type=uploaded_file.type or "application/pdf"
-                )
-            )
-
-    gemini_contents.append(user_text)
-
-# --- EXECUTE GEMINI CALL & SAVE ---
-if triggered:
-    active_thread["messages"].append(user_msg_record)
-    if active_thread["title"].startswith("New Chat ") and user_text:
-        active_thread["title"] = user_text[:30] + ("..." if len(user_text) > 30 else "")
-
-    with st.spinner("⚡ Spark is thinking..."):
-        try:
-            reply_msg = get_spark_reply(
-                action_mode=action_mode,
-                system_instruction=PERSONALITIES[selected_mood],
-                user_text=user_text,
-                gemini_contents=gemini_contents
-            )
-            active_thread["messages"].append(reply_msg)
-            save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
-
-            if auto_read and reply_msg.get("content"):
-                new_idx = len(active_thread["messages"]) - 1
-                cache_key = f"{st.session_state.current_thread_id}_{new_idx}"
-                audio_out = text_to_speech(reply_msg["content"], cache_key)
-                st.audio(audio_out, format="audio/mp3", autoplay=True)
-
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error: {e}")
