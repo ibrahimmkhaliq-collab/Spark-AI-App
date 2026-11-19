@@ -19,10 +19,111 @@ import uuid
 # --- PAGE SETUP ---
 st.set_page_config(page_title="Spark AI", page_icon="⚡", layout="wide")
 
-# --- THEME ENGINE (Dark, Dark UI, Light, Light UI) ---
+# --- API & SUPABASE SETUP ---
+api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
+if not api_key:
+    st.error("⚠️ Missing GEMINI_API_KEY! Please add it in your Streamlit Cloud Secrets.")
+    st.stop()
+
+client = genai.Client(api_key=api_key)
+
+PREFERRED_MODELS = [
+    "gemini-3.8-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
+    "gemini-4-hydrogen",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash",
+]
+
+@st.cache_data(ttl=3600)
+def get_available_chat_models():
+    blocked = ("image", "tts", "live", "embed", "aqa", "vision", "pro", "research", "computer", "robotics", "thinking")
+    try:
+        available = [
+            m.name.removeprefix("models/")
+            for m in client.models.list()
+            if "gemini" in m.name and not any(b in m.name.lower() for b in blocked)
+        ]
+        ordered = [m for m in PREFERRED_MODELS if m in available]
+        others = [m for m in available if m not in ordered]
+        return (ordered + others)[:4] if (ordered or others) else PREFERRED_MODELS[:3]
+    except Exception:
+        return PREFERRED_MODELS[:3]
+
+supabase = None
+supa_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
+supa_key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
+if supa_url and supa_key:
+    try:
+        supabase = create_client(supa_url, supa_key)
+    except Exception:
+        supabase = None
+
+# --- AUTHENTICATION GATE (Stay Signed In) ---
+if "user_email" not in st.session_state:
+    st.session_state.user_email = None
+
+if not st.session_state.user_email and supabase and "rt" in st.query_params:
+    try:
+        refreshed = supabase.auth.refresh_session(st.query_params["rt"])
+        if refreshed and refreshed.user:
+            st.session_state.user_email = refreshed.user.email
+            if refreshed.session:
+                st.query_params["rt"] = refreshed.session.refresh_token
+    except Exception:
+        st.query_params.clear()
+
+# --- PROFILE SYNC (LOADS SAVED THEME & AVATARS BEFORE RENDERING UI) ---
+def load_profile_from_supabase():
+    if not supabase or not st.session_state.get("user_email") or st.session_state.user_email == "guest@local":
+        return "💎", "⚡", "🌌 Dark UI"
+    try:
+        res = (
+            supabase.table("spark_profiles")
+            .select("*")
+            .eq("user_email", st.session_state.user_email)
+            .execute()
+        )
+        if res.data and len(res.data) > 0:
+            row = res.data[0]
+            return (
+                row.get("user_avatar") or "💎",
+                row.get("bot_avatar") or "⚡",
+                row.get("app_theme") or "🌌 Dark UI",
+            )
+    except Exception:
+        pass
+    return "💎", "⚡", "🌌 Dark UI"
+
+def save_profile_to_supabase(u_av, b_av, theme_name):
+    if not supabase or not st.session_state.get("user_email") or st.session_state.user_email == "guest@local":
+        return
+    try:
+        supabase.table("spark_profiles").upsert({
+            "user_email": st.session_state.user_email,
+            "user_avatar": u_av,
+            "bot_avatar": b_av,
+            "app_theme": theme_name,
+        }).execute()
+    except Exception as e:
+        st.warning(f"Could not save settings to cloud: {e}")
+
 if "app_theme" not in st.session_state:
     st.session_state.app_theme = "🌌 Dark UI"
+if "user_avatar" not in st.session_state:
+    st.session_state.user_avatar = "💎"
+if "bot_avatar" not in st.session_state:
+    st.session_state.bot_avatar = "⚡"
 
+if st.session_state.get("user_email") and not st.session_state.get("profile_loaded"):
+    u_av, b_av, saved_theme = load_profile_from_supabase()
+    st.session_state.user_avatar = u_av
+    st.session_state.bot_avatar = b_av
+    st.session_state.app_theme = saved_theme
+    st.session_state.profile_loaded = True
+
+# --- THEME ENGINE (Dark, Dark UI, Light, Light UI) ---
 THEMES = {
     "🌌 Dark UI": {
         "bg": "radial-gradient(circle at top right, #111827, #090d16 75%)",
@@ -77,6 +178,9 @@ THEMES = {
         "btn_text": "#ffffff",
     },
 }
+
+if st.session_state.app_theme not in THEMES:
+    st.session_state.app_theme = "🌌 Dark UI"
 
 t = THEMES[st.session_state.app_theme]
 
@@ -153,61 +257,6 @@ st.markdown(f"""
     }}
 </style>
 """, unsafe_allow_html=True)
-
-# --- API & SUPABASE SETUP ---
-api_key = st.secrets.get("GEMINI_API_KEY") or os.environ.get("GEMINI_API_KEY")
-if not api_key:
-    st.error("⚠️ Missing GEMINI_API_KEY! Please add it in your Streamlit Cloud Secrets.")
-    st.stop()
-
-client = genai.Client(api_key=api_key)
-
-PREFERRED_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-3.5-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-4-hydrogen",
-    "gemini-2.5-flash-lite",
-    "gemini-2.5-flash",
-]
-@st.cache_data(ttl=3600)
-def get_available_chat_models():
-    blocked = ("image", "tts", "live", "embed", "aqa", "vision", "pro", "research", "computer", "robotics", "thinking")
-    try:
-        available = [
-            m.name.removeprefix("models/")
-            for m in client.models.list()
-            if "gemini" in m.name and not any(b in m.name.lower() for b in blocked)
-        ]
-        ordered = [m for m in PREFERRED_MODELS if m in available]
-        others = [m for m in available if m not in ordered]
-        return (ordered + others)[:4] if (ordered or others) else PREFERRED_MODELS[:3]
-    except Exception:
-        return PREFERRED_MODELS[:3]
-
-supabase = None
-supa_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
-supa_key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
-if supa_url and supa_key:
-    try:
-        supabase = create_client(supa_url, supa_key)
-    except Exception:
-        supabase = None
-
-# --- AUTHENTICATION GATE (Stay Signed In) ---
-if "user_email" not in st.session_state:
-    st.session_state.user_email = None
-
-if not st.session_state.user_email and supabase and "rt" in st.query_params:
-    try:
-        refreshed = supabase.auth.refresh_session(st.query_params["rt"])
-        if refreshed and refreshed.user:
-            st.session_state.user_email = refreshed.user.email
-            if refreshed.session:
-                st.query_params["rt"] = refreshed.session.refresh_token
-    except Exception:
-        st.query_params.clear()
-
 if not st.session_state.user_email:
     col_l, col_mid, col_r = st.columns([1, 1.4, 1])
     with col_mid:
@@ -234,6 +283,7 @@ if not st.session_state.user_email:
                     try:
                         res = supabase.auth.sign_in_with_password({"email": login_email, "password": login_pass})
                         st.session_state.user_email = res.user.email
+                        st.session_state.pop("profile_loaded", None)
                         if res.session:
                             st.query_params["rt"] = res.session.refresh_token
                         st.rerun()
@@ -251,6 +301,7 @@ if not st.session_state.user_email:
                         res = supabase.auth.sign_up({"email": reg_email, "password": reg_pass})
                         if res.user:
                             st.session_state.user_email = res.user.email
+                            st.session_state.pop("profile_loaded", None)
                             if res.session:
                                 st.query_params["rt"] = res.session.refresh_token
                             st.success("Account created! Loading Spark AI...")
@@ -304,7 +355,6 @@ def get_all_unicode_emojis():
 
 ALL_EMOJIS = get_all_unicode_emojis()
 
-# --- AVATAR & SUPABASE SYNC HELPERS ---
 def encode_avatar_image(uploaded_img):
     img = Image.open(uploaded_img).convert("RGBA")
     img.thumbnail((96, 96))
@@ -313,38 +363,6 @@ def encode_avatar_image(uploaded_img):
     b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
     return f"data:image/png;base64,{b64}"
 
-def load_avatars_from_supabase():
-    if not supabase or st.session_state.user_email == "guest@local":
-        return "💎", "⚡"
-    try:
-        res = (
-            supabase.table("spark_profiles")
-            .select("*")
-            .eq("user_email", st.session_state.user_email)
-            .execute()
-        )
-        if res.data:
-            return res.data.get("user_avatar", "💎"), res.data.get("bot_avatar", "⚡")
-    except Exception:
-        pass
-    return "💎", "⚡"
-
-def save_avatars_to_supabase(u_av, b_av):
-    if not supabase or st.session_state.user_email == "guest@local":
-        return
-    try:
-        supabase.table("spark_profiles").upsert({
-            "user_email": st.session_state.user_email,
-            "user_avatar": u_av,
-            "bot_avatar": b_av
-        }).execute()
-    except Exception:
-        pass
-
-if "user_avatar" not in st.session_state or "bot_avatar" not in st.session_state:
-    u_av, b_av = load_avatars_from_supabase()
-    st.session_state.user_avatar = u_av
-    st.session_state.bot_avatar = b_av
 def load_threads_from_supabase():
     if not supabase or st.session_state.user_email == "guest@local":
         return None
@@ -437,18 +455,17 @@ def web_search_ddg(query, max_results=6):
 def generate_pptx(slides_data):
     prs = Presentation()
     for slide_info in slides_data:
-        slide = prs.slides.add_slide(prs.slide_layouts)
+        slide = prs.slides.add_slide(prs.slide_layouts[1])
         slide.shapes.title.text = slide_info.get("title", "Slide")
-        body = slide.placeholders.text_frame
+        body = slide.placeholders[1].text_frame
         body.clear()
         for idx, point in enumerate(slide_info.get("bullets", [])):
-            p = body.paragraphs if idx == 0 else body.add_paragraph()
+            p = body.paragraphs[0] if idx == 0 else body.add_paragraph()
             p.text = str(point)
     buf = io.BytesIO()
     prs.save(buf)
     buf.seek(0)
     return buf
-
 def generate_chart_image(chart_spec):
     chart_type = chart_spec.get("chart_type", "bar").lower()
     title = chart_spec.get("title", "Data Chart")
@@ -572,8 +589,8 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
                     contents=prompt_clean,
                     config=types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"]),
                 )
-                if res.candidates and res.candidates.content.parts:
-                    for part in res.candidates.content.parts:
+                if res.candidates and res.candidates[0].content.parts:
+                    for part in res.candidates[0].content.parts:
                         if part.inline_data and part.inline_data.data:
                             gen_img = Image.open(io.BytesIO(part.inline_data.data))
                             return {
@@ -659,8 +676,9 @@ with st.sidebar:
     if st.button("🚪 Sign Out", use_container_width=True):
         st.session_state.user_email = None
         st.session_state.pop("threads", None)
-        st.session_state.pop("user_avatar", None)
-        st.session_state.pop("bot_avatar", None)
+        st.session_state.pop("profile_loaded", None)
+        st.session_state.user_avatar = "💎"
+        st.session_state.bot_avatar = "⚡"
         st.query_params.clear()
         st.rerun()
 
@@ -672,143 +690,17 @@ with st.sidebar:
     )
     if selected_theme != st.session_state.app_theme:
         st.session_state.app_theme = selected_theme
+        save_profile_to_supabase(
+            st.session_state.user_avatar,
+            st.session_state.bot_avatar,
+            selected_theme,
+        )
         st.rerun()
 
     with st.expander("🎭 Customize Avatars (You & Spark)", expanded=False):
         av_tab1, av_tab2 = st.tabs(["👤 Your Icon", "⚡ Spark Icon"])
 
-        with av_tab1:
-            u_choice = st.selectbox(f"Browse All {len(ALL_EMOJIS)} Emojis (type to search):", ALL_EMOJIS, key="u_all_emojis")
-            u_custom = st.text_input("Or paste any emoji:", key="u_custom_emoji")
-            u_photo = st.file_uploader("Or upload your image:", type=["png", "jpg", "jpeg", "webp"], key="u_photo")
-            if st.button("Save Your Avatar", use_container_width=True):
-                if u_photo is not None:
-                    st.session_state.user_avatar = encode_avatar_image(u_photo)
-                elif u_custom.strip():
-                    st.session_state.user_avatar = u_custom.strip()
-                else:
-                    st.session_state.user_avatar = u_choice.split("  ")
-                save_avatars_to_supabase(st.session_state.user_avatar, st.session_state.bot_avatar)
-                st.rerun()
-
-        with av_tab2:
-            b_choice = st.selectbox(f"Browse All {len(ALL_EMOJIS)} Emojis for Spark:", ALL_EMOJIS, key="b_all_emojis")
-            b_custom = st.text_input("Or paste any emoji for Spark:", key="b_custom_emoji")
-            b_photo = st.file_uploader("Or upload Spark image:", type=["png", "jpg", "jpeg", "webp"], key="b_photo")
-            if st.button("Save Spark Avatar", use_container_width=True):
-                if b_photo is not None:
-                    st.session_state.bot_avatar = encode_avatar_image(b_photo)
-                elif b_custom.strip():
-                    st.session_state.bot_avatar = b_custom.strip()
-                else:
-                    st.session_state.bot_avatar = b_choice.split("  ")
-                save_avatars_to_supabase(st.session_state.user_avatar, st.session_state.bot_avatar)
-                st.rerun()
-
-    st.divider()
-    if st.button("➕ New Chat Thread", use_container_width=True, type="primary"):
-        create_new_thread()
-        st.rerun()
-
-    st.subheader("💬 Your Chat Threads")
-    thread_ids = list(st.session_state.threads.keys())
-    selected_thread_id = st.radio(
-        "Select a conversation:",
-        options=thread_ids,
-        index=thread_ids.index(st.session_state.current_thread_id),
-        format_func=lambda tid: st.session_state.threads[tid]["title"],
-        label_visibility="collapsed"
-    )
-    if selected_thread_id != st.session_state.current_thread_id:
-        st.session_state.current_thread_id = selected_thread_id
-        st.rerun()
-
-    new_title = st.text_input(
-        "✏️ Rename current chat:",
-        value=active_thread["title"],
-        key=f"rename_{st.session_state.current_thread_id}"
-    )
-    if new_title and new_title != active_thread["title"]:
-        active_thread["title"] = new_title
-        save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
-        st.rerun()
-
-    if len(st.session_state.threads) > 1:
-        if st.button("🗑️ Delete Current Thread", use_container_width=True):
-            del_id = st.session_state.current_thread_id
-            del st.session_state.threads[del_id]
-            delete_thread_from_supabase(del_id)
-            st.session_state.current_thread_id = next(iter(st.session_state.threads))
-            st.rerun()
-
-    st.divider()
-    selected_mood = st.selectbox("Spark's Focus Mode:", list(PERSONALITIES.keys()))
-    action_mode = st.radio(
-        "Action Mode:",
-        [
-            "💬 Smart Chat & Vision",
-            "🌐 Live Web Search",
-            "🎨 Generate AI Image",
-            "📊 Build Presentation Slide",
-            "📈 Create Data Chart",
-        ]
-    )
-    st.divider()
-    auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
-
-# --- MAIN HEADER ---
-st.title(f"⚡ {active_thread['title']}")
-st.caption(f"Current Mode: **{selected_mood}** | **{action_mode}**")
-
-# --- CUSTOM WEB SEARCH BROWSER ---
-with st.expander("🔍 Spark Custom Web Search Browser", expanded=False):
-    s_col1, s_col2 = st.columns(2)
-    with s_col1:
-        browser_query = st.text_input("Search the web directly inside Spark AI:", placeholder="Search news, sites, facts, tutorials...", label_visibility="collapsed")
-    with s_col2:
-        run_search = st.button("🔎 Search", type="primary", use_container_width=True)
-
-
-    if run_search and browser_query.strip():
-        with st.spinner("Searching the web..."):
-            st.session_state.search_results = web_search_ddg(browser_query.strip(), max_results=6)
-
-    if st.session_state.search_results:
-        for r_idx, item in enumerate(st.session_state.search_results):
-            st.markdown(f"**[{item.get('title', 'Result')}]({item.get('href', '#')})**")
-            st.caption(item.get("body", ""))
-            if st.button("💬 Ask Spark to Summarize This Page", key=f"sum_web_{r_idx}"):
-                summary_prompt = f"Summarize and explain this web result:\nTitle: {item.get('title')}\nURL: {item.get('href')}\nSnippet: {item.get('body')}"
-                active_thread["messages"].append({"role": "user", "content": f"🌐 Summarize: **{item.get('title')}**"})
-                reply = get_spark_reply("💬 Smart Chat & Vision", PERSONALITIES[selected_mood], summary_prompt, [summary_prompt])
-                active_thread["messages"].append(reply)
-                save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
-                st.rerun()
-            st.divider()
-
-# --- DISPLAY ACTIVE THREAD HISTORY ---
-for idx, msg in enumerate(active_thread["messages"]):
-    av = st.session_state.bot_avatar if msg["role"] == "assistant" else st.session_state.user_avatar
-    with st.chat_message(msg["role"], avatar=av):
-        if msg.get("image"):
-            st.image(msg["image"], width=420)
-        if msg.get("file_name"):
-            st.info(f"📎 Attached file: **{msg['file_name']}**")
-        st.markdown(msg["content"])
-        if msg.get("pptx_bytes"):
-            st.download_button(
-                label="📥 Download PowerPoint (.pptx)",
-                data=msg["pptx_bytes"],
-                file_name="Spark_Presentation.pptx",
-                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                key=f"dl_{st.session_state.current_thread_id}_{idx}"
-            )
-        if msg["role"] == "assistant" and msg.get("content"):
-            cache_key = f"{st.session_state.current_thread_id}_{idx}"
-            if st.button("🔊 Read Aloud", key=f"tts_{cache_key}"):
-                audio_bytes = text_to_speech(msg["content"], cache_key)
-                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-# --- ATTACHMENTS & VOICE EXPANDER ---
+        with av_tab1:# --- ATTACHMENTS & VOICE EXPANDER ---
 with st.expander("📎 Attach Image / File or 🎙️ Record Voice", expanded=False):
     col1, col2 = st.columns(2)
     with col1:
