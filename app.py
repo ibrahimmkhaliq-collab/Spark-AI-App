@@ -33,8 +33,6 @@ PREFERRED_MODELS = [
     "gemini-3.5-flash-lite",
 ]
 
-]
-
 @st.cache_data(ttl=3600)
 def get_available_chat_models():
     blocked = ("image", "tts", "live", "embed", "aqa", "vision", "pro", "research", "computer", "robotics", "thinking")
