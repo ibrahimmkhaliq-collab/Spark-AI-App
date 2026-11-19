@@ -715,7 +715,7 @@ with st.sidebar:
         av_tab1, av_tab2 = st.tabs(["👤 Your Icon", "⚡ Spark Icon"])
 
         with av_tab1:
-                        u_choice = st.selectbox(f"Browse All {len(ALL_EMOJIS)} Emojis (type to search):", ALL_EMOJIS, key="u_all_emojis")
+            u_choice = st.selectbox(f"Browse All {len(ALL_EMOJIS)} Emojis (type to search):", ALL_EMOJIS, key="u_all_emojis")
             u_custom = st.text_input("Or paste any emoji:", key="u_custom_emoji")
             u_photo = st.file_uploader("Or upload your image:", type=["png", "jpg", "jpeg", "webp"], key="u_photo")
             if st.button("Save Your Avatar", use_container_width=True):
