@@ -915,8 +915,7 @@ if triggered:
     bot_av = get_valid_avatar(raw_bot_av, "⚡")
 
     try:
-        
-                         if action_mode == "💬 Smart Chat & Vision":
+        if action_mode == "💬 Smart Chat & Vision":
             with st.chat_message("assistant", avatar=bot_av):
                 def stream_gemini():
                     models = get_available_chat_models()
@@ -941,3 +940,24 @@ if triggered:
 
                 full_reply = st.write_stream(stream_gemini())
             reply_msg = {"role": "assistant", "content": full_reply}
+        else:
+            with st.spinner("⚡ Spark is working..."):
+                reply_msg = get_spark_reply(
+                    action_mode=action_mode,
+                    system_instruction=PERSONALITIES[selected_mood],
+                    user_text=user_text,
+                    gemini_contents=gemini_contents,
+                )
+
+        active_thread["messages"].append(reply_msg)
+        save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
+
+        if auto_read and reply_msg.get("content"):
+            new_idx = len(active_thread["messages"]) - 1
+            cache_key = f"{st.session_state.current_thread_id}_{new_idx}"
+            audio_out = text_to_speech(reply_msg["content"], cache_key)
+            st.audio(audio_out, format="audio/mp3", autoplay=True)
+
+        st.rerun()
+    except Exception as e:
+        st.error(f"Error: {e}")
