@@ -28,12 +28,14 @@ if not api_key:
 client = genai.Client(api_key=api_key)
 
 PREFERRED_MODELS = [
+    "gemini-3.8-flash",
     "gemini-3.5-flash",
     "gemini-3.5-flash-lite",
 ]
 
-@st.cache_data(ttl=3600)
 def get_available_chat_models():
+    return PREFERRED_MODELS
+
     blocked = ("image", "tts", "live", "embed", "aqa", "vision", "pro", "research", "computer", "robotics", "thinking")
     try:
         available = [
