@@ -85,8 +85,8 @@ def load_profile_from_supabase():
             .eq("user_email", st.session_state.user_email)
             .execute()
         )
-        if res.data and len(res.data) > 0:
-            row = res.data[0]
+        if res.data:
+            row = next(iter(res.data))
             return (
                 row.get("user_avatar") or "💎",
                 row.get("bot_avatar") or "⚡",
@@ -362,6 +362,20 @@ def encode_avatar_image(uploaded_img):
     img.save(buf, format="PNG")
     b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
     return f"data:image/png;base64,{b64}"
+
+def get_valid_avatar(av_value, fallback):
+    if not av_value or not isinstance(av_value, str):
+        return fallback
+    val = av_value.strip()
+    if val.startswith("data:image/") and ";base64," in val:
+        try:
+            _, b64_part = val.split(";base64,", 1)
+            return Image.open(io.BytesIO(base64.b64decode(b64_part)))
+        except Exception:
+            return fallback
+    if len(val) <= 8:
+        return val
+    return fallback
 
 def load_threads_from_supabase():
     if not supabase or st.session_state.user_email == "guest@local":
@@ -697,9 +711,129 @@ with st.sidebar:
         )
         st.rerun()
 
-  # --- DISPLAY ACTIVE THREAD HISTORY ---
+    with st.expander("🎭 Customize Avatars (You & Spark)", expanded=False):
+        av_tab1, av_tab2 = st.tabs(["👤 Your Icon", "⚡ Spark Icon"])
+
+        with av_tab1:
+                        u_choice = st.selectbox(f"Browse All {len(ALL_EMOJIS)} Emojis (type to search):", ALL_EMOJIS, key="u_all_emojis")
+            u_custom = st.text_input("Or paste any emoji:", key="u_custom_emoji")
+            u_photo = st.file_uploader("Or upload your image:", type=["png", "jpg", "jpeg", "webp"], key="u_photo")
+            if st.button("Save Your Avatar", use_container_width=True):
+                if u_photo is not None:
+                    st.session_state.user_avatar = encode_avatar_image(u_photo)
+                elif u_custom.strip():
+                    st.session_state.user_avatar = u_custom.strip()
+                else:
+                    st.session_state.user_avatar = next(iter(u_choice.split("  ")))
+                save_profile_to_supabase(
+                    st.session_state.user_avatar,
+                    st.session_state.bot_avatar,
+                    st.session_state.app_theme,
+                )
+                st.rerun()
+
+        with av_tab2:
+            b_choice = st.selectbox(f"Browse All {len(ALL_EMOJIS)} Emojis for Spark:", ALL_EMOJIS, key="b_all_emojis")
+            b_custom = st.text_input("Or paste any emoji for Spark:", key="b_custom_emoji")
+            b_photo = st.file_uploader("Or upload Spark image:", type=["png", "jpg", "jpeg", "webp"], key="b_photo")
+            if st.button("Save Spark Avatar", use_container_width=True):
+                if b_photo is not None:
+                    st.session_state.bot_avatar = encode_avatar_image(b_photo)
+                elif b_custom.strip():
+                    st.session_state.bot_avatar = b_custom.strip()
+                else:
+                    st.session_state.bot_avatar = next(iter(b_choice.split("  ")))
+                save_profile_to_supabase(
+                    st.session_state.user_avatar,
+                    st.session_state.bot_avatar,
+                    st.session_state.app_theme,
+                )
+                st.rerun()
+
+    st.divider()
+    if st.button("➕ New Chat Thread", use_container_width=True, type="primary"):
+        create_new_thread()
+        st.rerun()
+
+    st.subheader("💬 Your Chat Threads")
+    thread_ids = list(st.session_state.threads.keys())
+    selected_thread_id = st.radio(
+        "Select a conversation:",
+        options=thread_ids,
+        index=thread_ids.index(st.session_state.current_thread_id),
+        format_func=lambda tid: st.session_state.threads[tid]["title"],
+        label_visibility="collapsed"
+    )
+    if selected_thread_id != st.session_state.current_thread_id:
+        st.session_state.current_thread_id = selected_thread_id
+        st.rerun()
+
+    new_title = st.text_input(
+        "✏️ Rename current chat:",
+        value=active_thread["title"],
+        key=f"rename_{st.session_state.current_thread_id}"
+    )
+    if new_title and new_title != active_thread["title"]:
+        active_thread["title"] = new_title
+        save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
+        st.rerun()
+
+    if len(st.session_state.threads) > 1:
+        if st.button("🗑️ Delete Current Thread", use_container_width=True):
+            del_id = st.session_state.current_thread_id
+            del st.session_state.threads[del_id]
+            delete_thread_from_supabase(del_id)
+            st.session_state.current_thread_id = next(iter(st.session_state.threads))
+            st.rerun()
+
+    st.divider()
+    selected_mood = st.selectbox("Spark's Focus Mode:", list(PERSONALITIES.keys()))
+    action_mode = st.radio(
+        "Action Mode:",
+        [
+            "💬 Smart Chat & Vision",
+            "🌐 Live Web Search",
+            "🎨 Generate AI Image",
+            "📊 Build Presentation Slide",
+            "📈 Create Data Chart",
+        ]
+    )
+    st.divider()
+    auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
+
+# --- MAIN HEADER ---
+st.title(f"⚡ {active_thread['title']}")
+st.caption(f"Current Mode: **{selected_mood}** | **{action_mode}**")
+
+# --- CUSTOM WEB SEARCH BROWSER ---
+with st.expander("🔍 Spark Custom Web Search Browser", expanded=False):
+    s_col1, s_col2 = st.columns(2)
+    with s_col1:
+        browser_query = st.text_input("Search the web directly inside Spark AI:", placeholder="Search news, sites, facts, tutorials...", label_visibility="collapsed")
+    with s_col2:
+        run_search = st.button("🔎 Search", type="primary", use_container_width=True)
+
+    if run_search and browser_query.strip():
+        with st.spinner("Searching the web..."):
+            st.session_state.search_results = web_search_ddg(browser_query.strip(), max_results=6)
+
+    if st.session_state.search_results:
+        for r_idx, item in enumerate(st.session_state.search_results):
+            st.markdown(f"**[{item.get('title', 'Result')}]({item.get('href', '#')})**")
+            st.caption(item.get("body", ""))
+            if st.button("💬 Ask Spark to Summarize This Page", key=f"sum_web_{r_idx}"):
+                summary_prompt = f"Summarize and explain this web result:\nTitle: {item.get('title')}\nURL: {item.get('href')}\nSnippet: {item.get('body')}"
+                active_thread["messages"].append({"role": "user", "content": f"🌐 Summarize: **{item.get('title')}**"})
+                reply = get_spark_reply("💬 Smart Chat & Vision", PERSONALITIES[selected_mood], summary_prompt, [summary_prompt])
+                active_thread["messages"].append(reply)
+                save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
+                st.rerun()
+            st.divider()
+
+# --- DISPLAY ACTIVE THREAD HISTORY ---
 for idx, msg in enumerate(active_thread["messages"]):
-    av = st.session_state.bot_avatar if msg["role"] == "assistant" else st.session_state.user_avatar
+    raw_av = st.session_state.bot_avatar if msg["role"] == "assistant" else st.session_state.user_avatar
+    av = get_valid_avatar(raw_av, "⚡" if msg["role"] == "assistant" else "💎")
     with st.chat_message(msg["role"], avatar=av):
         if msg.get("image"):
             st.image(msg["image"], width=420)
@@ -722,7 +856,12 @@ for idx, msg in enumerate(active_thread["messages"]):
 
 # --- ATTACHMENTS & VOICE EXPANDER ---
 with st.expander("📎 Attach Image / File or 🎙️ Record Voice", expanded=False):
-
+    col1, col2 = st.columns(2)
+    with col1:
+        uploaded_file = st.file_uploader(
+            "Upload Image or Document",
+            type=["png", "jpg", "jpeg", "webp", "pdf", "txt", "csv", "py", "md"]
+        )
     with col2:
         voice_audio = st.audio_input("Record Voice Message") if hasattr(st, "audio_input") else None
 
