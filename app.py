@@ -907,21 +907,19 @@ elif user_prompt:
     gemini_contents.append(user_text)
     
     def build_chat_history_contents(messages, current_turn_parts):
-    history_contents = []
-    # Send the last 20 messages so Spark remembers the full conversation
-    for m in messages[-20:]:
-        role = "model" if m["role"] == "assistant" else "user"
-        text = m.get("content", "")
-        if text:
-            history_contents.append(
-                types.Content(role=role, parts=[types.Part.from_text(text=text)])
-            )
-    history_contents.append(
-        types.Content(role="user", parts=current_turn_parts)
-    )
-    return history_contents
-
-        st.error(f"Error: {e}")
+        history_contents = []
+        # Send the last 20 messages so Spark remembers the full conversation
+        for m in messages[-20:]:
+            role = "model" if m["role"] == "assistant" else "user"
+            text = m.get("content", "")
+            if text:
+                history_contents.append(
+                    types.Content(role=role, parts=[types.Part.from_text(text=text)])
+                )
+        history_contents.append(
+            types.Content(role="user", parts=current_turn_parts)
+        )
+        return history_contents
 # --- EXECUTE GEMINI CALL & SAVE ---
 if triggered:
     full_contents = build_chat_history_contents(active_thread["messages"], gemini_contents)
