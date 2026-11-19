@@ -5,3 +5,4 @@ pillow
 python-pptx
 gTTS
 emoji
+duckduckgo-search
