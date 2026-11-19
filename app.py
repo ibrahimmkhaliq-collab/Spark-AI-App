@@ -580,11 +580,10 @@ with st.sidebar:
                     st.session_state.user_avatar = u_choice.split("  ")[0]
                 save_avatars_to_supabase(st.session_state.user_avatar, st.session_state.bot_avatar)
                 st.rerun()
-
         with av_tab2:
-            b_choice = st.selectbox(f"Browse All {len(ALL_EMOJIS)} Emojis for Spark:", ALL_EMOJIS, key="b_all_emoji
+            b_choice = st.selectbox(f"Browse All {len(ALL_EMOJIS)} Emojis for Spark:", ALL_EMOJIS, key="b_all_emojis")
             b_custom = st.text_input("Or paste any emoji for Spark:", key="b_custom_emoji")
-                        b_photo = st.file_uploader("Or upload Spark image:", type=["png", "jpg", "jpeg", "webp"], key="b_photo")
+            b_photo = st.file_uploader("Or upload Spark image:", type=["png", "jpg", "jpeg", "webp"], key="b_photo")
             if st.button("Save Spark Avatar", use_container_width=True):
                 if b_photo is not None:
                     st.session_state.bot_avatar = encode_avatar_image(b_photo)
@@ -593,6 +592,8 @@ with st.sidebar:
                 else:
                     st.session_state.bot_avatar = b_choice.split("  ")[0]
                 save_avatars_to_supabase(st.session_state.user_avatar, st.session_state.bot_avatar)
+                st.rerun()
+
                 st.rerun()
 
     st.divider()
