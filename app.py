@@ -916,9 +916,21 @@ if triggered:
 
     try:
         if action_mode == "💬 Smart Chat & Vision":
+            if "live_flash_models" not in st.session_state:
+                blocked = ("image", "tts", "live", "embed", "aqa", "vision", "pro", "research", "computer", "robotics", "thinking")
+                try:
+                    found = [
+                        m.name.removeprefix("models/")
+                        for m in client.models.list()
+                        if "flash" in m.name.lower() and not any(b in m.name.lower() for b in blocked)
+                    ]
+                except Exception:
+                    found = []
+                st.session_state["live_flash_models"] = found or PREFERRED_MODELS
+
             with st.chat_message("assistant", avatar=bot_av):
                 def stream_gemini():
-                    models_to_try = PREFERRED_MODELS
+                    models_to_try = st.session_state["live_flash_models"]
                     if st.session_state.get("fast_model") in models_to_try:
                         fm = st.session_state["fast_model"]
                         models_to_try = [fm] + [m for m in models_to_try if m != fm]
@@ -931,8 +943,7 @@ if triggered:
                                 model=m_name,
                                 contents=gemini_contents,
                                 config=types.GenerateContentConfig(
-                                    system_instruction=PERSONALITIES[selected_mood],
-                                    thinking_config=types.ThinkingConfig(thinking_budget=0),
+                                    system_instruction=PERSONALITIES[selected_mood]
                                 ),
                             ):
                                 if chunk.text:
@@ -944,7 +955,7 @@ if triggered:
                         except Exception as e:
                             last_err = e
                             continue
-                    raise RuntimeError(f"All models failed: {last_err}")
+                    raise RuntimeError(f"Could not generate reply: {last_err}")
 
                 full_reply = st.write_stream(stream_gemini())
             reply_msg = {"role": "assistant", "content": str(full_reply)}
