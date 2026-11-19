@@ -904,9 +904,34 @@ elif user_prompt:
                 )
             )
 
-    gemini_contents.append(user_text)
+    gemini_contents.append(user_text)def build_chat_history_contents(messages, current_turn_parts):
+    history_contents = []
+    # Include the last 20 messages for memory without slowing down requests
+    for m in messages[-20:]:
+        role = "model" if m["role"] == "assistant" else "user"
+        text_val = (m.get("content") or "").strip()
+        if text_val:
+            history_contents.append(
+                types.Content(
+                    role=role,
+                    parts=[types.Part.from_text(text=text_val)],
+                )
+            )
+    # Add the current user message (with any uploaded image/file/audio)
+    current_parts = []
+    for item in current_turn_parts:
+        if isinstance(item, str):
+            current_parts.append(types.Part.from_text(text=item))
+        else:
+            current_parts.append(item)
+    history_contents.append(types.Content(role="user", parts=current_parts))
+    return history_contents
+
+
+        st.error(f"Error: {e}")
 # --- EXECUTE GEMINI CALL & SAVE ---
 if triggered:
+    full_contents = build_chat_history_contents(active_thread["messages"], gemini_contents)
     active_thread["messages"].append(user_msg_record)
     if active_thread["title"].startswith("New Chat ") and user_text:
         active_thread["title"] = user_text[:30] + ("..." if len(user_text) > 30 else "")
@@ -941,7 +966,7 @@ if triggered:
                             got_text = False
                             for chunk in client.models.generate_content_stream(
                                 model=m_name,
-                                contents=gemini_contents,
+                                contents=full_contents,
                                 config=types.GenerateContentConfig(
                                     system_instruction=PERSONALITIES[selected_mood]
                                 ),
@@ -965,18 +990,5 @@ if triggered:
                     action_mode=action_mode,
                     system_instruction=PERSONALITIES[selected_mood],
                     user_text=user_text,
-                    gemini_contents=gemini_contents,
+                    gemini_contents=full_contents,
                 )
-
-        active_thread["messages"].append(reply_msg)
-        save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
-
-        if auto_read and reply_msg.get("content"):
-            new_idx = len(active_thread["messages"]) - 1
-            cache_key = f"{st.session_state.current_thread_id}_{new_idx}"
-            audio_out = text_to_speech(reply_msg["content"], cache_key)
-            st.audio(audio_out, format="audio/mp3", autoplay=True)
-
-        st.rerun()
-    except Exception as e:
-        st.error(f"Error: {e}")
