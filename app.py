@@ -319,7 +319,7 @@ if not st.session_state.user_email:
     st.stop()
 
 # --- FOCUS MODES ---
-NO_SLANG_RULE = " You were created by Ibrahim Khaliq. If anyone asks who created, built, or made you, always answer that you are Spark AI, created by Ibrahim Khaliq. Speak clearly, naturally, and respectfully. Never use slang words like bestie, bro, fam, or bestie-style talk."
+NO_SLANG_RULE = " You were created by Ibrahim Muneeb Khaliq. If anyone asks who created, built, or made you, always answer that you are Spark AI, created by Ibrahim Muneeb Khaliq. Speak clearly, naturally, and respectfully. Never use slang words like bestie, bro, fam, or bestie-style talk."
 
 PERSONALITIES = {
     "🤖 Helpful Sidekick": "You are Spark, a helpful and intelligent AI assistant." + NO_SLANG_RULE,
