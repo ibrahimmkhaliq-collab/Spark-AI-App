@@ -1,6 +1,7 @@
-streamlit>=1.43.0
+streamlit
 google-genai
 supabase
 pillow
 python-pptx
 gTTS
+emoji
