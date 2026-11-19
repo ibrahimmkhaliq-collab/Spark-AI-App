@@ -582,7 +582,7 @@ with st.sidebar:
                 st.rerun()
 
         with av_tab2:
-            b_choice = st.selectbox(f"Browse All {len(ALL_EMOJIS)} Emojis for Spark:", ALL_EMOJIS, key="b_all_emojis")
+            b_choice = st.selectbox(f"Browse All {len(ALL_EMOJIS)} Emojis for Spark:", ALL_EMOJIS, key="b_all_emoji
             b_custom = st.text_input("Or paste any emoji for Spark:", key="b_custom_emoji")
                         b_photo = st.file_uploader("Or upload Spark image:", type=["png", "jpg", "jpeg", "webp"], key="b_photo")
             if st.button("Save Spark Avatar", use_container_width=True):
