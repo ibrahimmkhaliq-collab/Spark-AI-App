@@ -6,11 +6,14 @@ from PIL import Image
 from pptx import Presentation
 from gtts import gTTS
 from duckduckgo_search import DDGS
+import matplotlib.pyplot as plt
 import base64
 import io
 import json
 import os
 import unicodedata
+import urllib.parse
+import urllib.request
 import uuid
 
 # --- PAGE SETUP ---
@@ -275,7 +278,7 @@ PERSONALITIES = {
     "🃏 Clever Humor": "You are Spark, a clever companion. Use smart analogies and light humor." + NO_SLANG_RULE
 }
 
-# --- FULL UNICODE EMOJI DATABASE (ALL EMOJIS + NAMES FOR SEARCH) ---
+# --- FULL UNICODE EMOJI DATABASE ---
 @st.cache_data
 def get_all_unicode_emojis():
     ranges = [
@@ -321,7 +324,7 @@ def load_avatars_from_supabase():
             .execute()
         )
         if res.data:
-            return res.data[0].get("user_avatar", "💎"), res.data[0].get("bot_avatar", "⚡")
+            return res.data.get("user_avatar", "💎"), res.data.get("bot_avatar", "⚡")
     except Exception:
         pass
     return "💎", "⚡"
@@ -434,17 +437,76 @@ def web_search_ddg(query, max_results=6):
 def generate_pptx(slides_data):
     prs = Presentation()
     for slide_info in slides_data:
-        slide = prs.slides.add_slide(prs.slide_layouts[1])
+        slide = prs.slides.add_slide(prs.slide_layouts)
         slide.shapes.title.text = slide_info.get("title", "Slide")
-        body = slide.placeholders[1].text_frame
+        body = slide.placeholders.text_frame
         body.clear()
         for idx, point in enumerate(slide_info.get("bullets", [])):
-            p = body.paragraphs[0] if idx == 0 else body.add_paragraph()
-            p.text = point
+            p = body.paragraphs if idx == 0 else body.add_paragraph()
+            p.text = str(point)
     buf = io.BytesIO()
     prs.save(buf)
     buf.seek(0)
     return buf
+
+def generate_chart_image(chart_spec):
+    chart_type = chart_spec.get("chart_type", "bar").lower()
+    title = chart_spec.get("title", "Data Chart")
+    labels = [str(x) for x in chart_spec.get("labels", [])]
+    values = [float(y) for y in chart_spec.get("values", [])]
+    x_label = chart_spec.get("x_label", "")
+    y_label = chart_spec.get("y_label", "")
+
+    fig, ax = plt.subplots(figsize=(7, 4.2), dpi=150)
+    fig.patch.set_facecolor("#0f172a")
+    ax.set_facecolor("#1e293b")
+    colors = ["#38bdf8", "#facc15", "#a855f7", "#34d399", "#fb7185", "#f97316"]
+
+    if chart_type == "pie":
+        wedges, texts, autotexts = ax.pie(
+            values,
+            labels=labels,
+            autopct="%1.1f%%",
+            colors=colors[:len(values)],
+            textprops={"color": "#f8fafc", "fontsize": 9},
+        )
+        for at in autotexts:
+            at.set_color("#0f172a")
+            at.set_fontweight("bold")
+    elif chart_type == "line":
+        ax.plot(labels, values, marker="o", linewidth=2.5, color="#38bdf8")
+        ax.fill_between(labels, values, color="#38bdf8", alpha=0.18)
+    else:
+        bars = ax.bar(labels, values, color=colors[:len(values)], width=0.55)
+        for bar in bars:
+            h = bar.get_height()
+            ax.annotate(
+                f"{h:g}",
+                xy=(bar.get_x() + bar.get_width() / 2, h),
+                xytext=(0, 4),
+                textcoords="offset points",
+                ha="center",
+                color="#f8fafc",
+                fontsize=9,
+            )
+
+    ax.set_title(title, color="#f8fafc", fontsize=12, fontweight="bold", pad=12)
+    if chart_type != "pie":
+        ax.set_xlabel(x_label, color="#cbd5e1", fontsize=9)
+        ax.set_ylabel(y_label, color="#cbd5e1", fontsize=9)
+        ax.tick_params(colors="#cbd5e1", labelsize=9)
+        ax.grid(axis="y", linestyle="--", alpha=0.2, color="#94a3b8")
+        for spine in ["top", "right"]:
+            ax.spines[spine].set_visible(False)
+        for spine in ["bottom", "left"]:
+            ax.spines[spine].set_color("#475569")
+
+    plt.tight_layout()
+    buf = io.BytesIO()
+    plt.savefig(buf, format="png", facecolor=fig.get_facecolor())
+    plt.close(fig)
+    buf.seek(0)
+    return Image.open(buf)
 
 def text_to_speech(text, cache_key):
     if cache_key not in st.session_state.audio_cache:
@@ -496,280 +558,42 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
         return {"role": "assistant", "content": response.text}
 
     if action_mode == "🎨 Generate AI Image":
-        for img_model in ["gemini-3.1-flash-image", "gemini-2.5-flash-image"]:
+        prompt_clean = (user_text or "A futuristic glowing spark").strip()
+        image_models = [
+            "gemini-3.1-flash-image-preview",
+            "gemini-2.5-flash-image",
+            "gemini-3-pro-image-preview",
+        ]
+        last_img_err = ""
+        for img_model in image_models:
             try:
                 res = client.models.generate_content(
                     model=img_model,
-                    contents=user_text or "A futuristic glowing spark",
-                    config=types.GenerateContentConfig(response_modalities=["IMAGE"]),
+                    contents=prompt_clean,
+                    config=types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"]),
                 )
-                for part in res.candidates[0].content.parts:
-                    if part.inline_data:
-                        gen_img = Image.open(io.BytesIO(part.inline_data.data))
-                        return {
-                            "role": "assistant",
-                            "content": f"Here is your generated image for: **{user_text}**",
-                            "image": gen_img,
-                        }
-            except Exception:
+                if res.candidates and res.candidates.content.parts:
+                    for part in res.candidates.content.parts:
+                        if part.inline_data and part.inline_data.data:
+                            gen_img = Image.open(io.BytesIO(part.inline_data.data))
+                            return {
+                                "role": "assistant",
+                                "content": f"Here is your generated image for: **{prompt_clean}**",
+                                "image": gen_img,
+                            }
+            except Exception as e:
+                last_img_err = str(e)
                 continue
-        raise RuntimeError("Image generation model is currently unavailable for this API key.")
 
-    if action_mode == "📊 Build Presentation Slide":
-        ppt_prompt = (
-            f"Create a 5-slide presentation about: {user_text}. "
-            "Return ONLY valid JSON as a list of objects with keys 'title' and 'bullets' (list of strings)."
-        )
-        response = generate_with_fallback(
-            contents=ppt_prompt,
-            config=types.GenerateContentConfig(
-                system_instruction=system_instruction,
-                response_mime_type="application/json"
-            )
-        )
-        slides_data = json.loads(response.text)
-        pptx_file = generate_pptx(slides_data)
-        return {
-            "role": "assistant",
-            "content": f"I built a **{len(slides_data)}-slide presentation** on **{user_text}**.",
-            "pptx_bytes": pptx_file.getvalue()
-        }
-
-    response = generate_with_fallback(
-        contents=gemini_contents,
-        config=types.GenerateContentConfig(system_instruction=system_instruction)
-    )
-    return {"role": "assistant", "content": response.text}
-
-# --- SIDEBAR CONTROLS & CHAT THREADS ---
-with st.sidebar:
-    st.title("⚡ Spark AI")
-    st.caption(f"👤 Signed in: **{st.session_state.user_email}**")
-    if st.button("🚪 Sign Out", use_container_width=True):
-        st.session_state.user_email = None
-        st.session_state.pop("threads", None)
-        st.session_state.pop("user_avatar", None)
-        st.session_state.pop("bot_avatar", None)
-        st.query_params.clear()
-        st.rerun()
-
-    st.divider()
-    selected_theme = st.selectbox(
-        "🎨 App Theme:",
-        list(THEMES.keys()),
-        index=list(THEMES.keys()).index(st.session_state.app_theme),
-    )
-    if selected_theme != st.session_state.app_theme:
-        st.session_state.app_theme = selected_theme
-        st.rerun()
-
-    # --- CUSTOMIZE AVATARS (ALL UNICODE EMOJIS + UPLOADED PHOTOS) ---
-    with st.expander("🎭 Customize Avatars (You & Spark)", expanded=False):
-        av_tab1, av_tab2 = st.tabs(["👤 Your Icon", "⚡ Spark Icon"])
-
-        with av_tab1:
-            u_choice = st.selectbox(f"Browse All {len(ALL_EMOJIS)} Emojis (type to search):", ALL_EMOJIS, key="u_all_emojis")
-            u_custom = st.text_input("Or paste any emoji:", key="u_custom_emoji")
-            u_photo = st.file_uploader("Or upload your image:", type=["png", "jpg", "jpeg", "webp"], key="u_photo")
-            if st.button("Save Your Avatar", use_container_width=True):
-                if u_photo is not None:
-                    st.session_state.user_avatar = encode_avatar_image(u_photo)
-                elif u_custom.strip():
-                    st.session_state.user_avatar = u_custom.strip()
-                else:
-                    st.session_state.user_avatar = u_choice.split("  ")[0]
-                save_avatars_to_supabase(st.session_state.user_avatar, st.session_state.bot_avatar)
-                st.rerun()
-        with av_tab2:
-            b_choice = st.selectbox(f"Browse All {len(ALL_EMOJIS)} Emojis for Spark:", ALL_EMOJIS, key="b_all_emojis")
-            b_custom = st.text_input("Or paste any emoji for Spark:", key="b_custom_emoji")
-            b_photo = st.file_uploader("Or upload Spark image:", type=["png", "jpg", "jpeg", "webp"], key="b_photo")
-            if st.button("Save Spark Avatar", use_container_width=True):
-                if b_photo is not None:
-                    st.session_state.bot_avatar = encode_avatar_image(b_photo)
-                elif b_custom.strip():
-                    st.session_state.bot_avatar = b_custom.strip()
-                else:
-                    st.session_state.bot_avatar = b_choice.split("  ")[0]
-                save_avatars_to_supabase(st.session_state.user_avatar, st.session_state.bot_avatar)
-                st.rerun()
-
-                st.rerun()
-
-    st.divider()
-    if st.button("➕ New Chat Thread", use_container_width=True, type="primary"):
-        create_new_thread()
-        st.rerun()
-
-    st.subheader("💬 Your Chat Threads")
-    thread_ids = list(st.session_state.threads.keys())
-    selected_thread_id = st.radio(
-        "Select a conversation:",
-        options=thread_ids,
-        index=thread_ids.index(st.session_state.current_thread_id),
-        format_func=lambda tid: st.session_state.threads[tid]["title"],
-        label_visibility="collapsed"
-    )
-    if selected_thread_id != st.session_state.current_thread_id:
-        st.session_state.current_thread_id = selected_thread_id
-        st.rerun()
-
-    new_title = st.text_input(
-        "✏️ Rename current chat:",
-        value=active_thread["title"],
-        key=f"rename_{st.session_state.current_thread_id}"
-    )
-    if new_title and new_title != active_thread["title"]:
-        active_thread["title"] = new_title
-        save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
-        st.rerun()
-
-    if len(st.session_state.threads) > 1:
-        if st.button("🗑️ Delete Current Thread", use_container_width=True):
-            del_id = st.session_state.current_thread_id
-            del st.session_state.threads[del_id]
-            delete_thread_from_supabase(del_id)
-            st.session_state.current_thread_id = next(iter(st.session_state.threads))
-            st.rerun()
-
-    st.divider()
-    selected_mood = st.selectbox("Spark's Focus Mode:", list(PERSONALITIES.keys()))
-    action_mode = st.radio(
-        "Action Mode:",
-        ["💬 Smart Chat & Vision", "🌐 Live Web Search", "🎨 Generate AI Image", "📊 Build Presentation Slide"]
-    )
-    st.divider()
-    auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
-
-# --- MAIN HEADER ---
-st.title(f"⚡ {active_thread['title']}")
-st.caption(f"Current Mode: **{selected_mood}** | **{action_mode}**")
-
-# --- CUSTOM WEB SEARCH BROWSER ---
-with st.expander("🔍 Spark Custom Web Search Browser", expanded=False):
-    s_col1, s_col2 = st.columns([4, 1])
-    with s_col1:
-        browser_query = st.text_input("Search the web directly inside Spark AI:", placeholder="Search news, sites, facts, tutorials...", label_visibility="collapsed")
-    with s_col2:
-        run_search = st.button("🔎 Search", type="primary", use_container_width=True)
-
-    if run_search and browser_query.strip():
-        with st.spinner("Searching the web..."):
-            st.session_state.search_results = web_search_ddg(browser_query.strip(), max_results=6)
-
-    if st.session_state.search_results:
-        for r_idx, item in enumerate(st.session_state.search_results):
-            st.markdown(f"**[{item.get('title', 'Result')}]({item.get('href', '#')})**")
-            st.caption(item.get("body", ""))
-            if st.button("💬 Ask Spark to Summarize This Page", key=f"sum_web_{r_idx}"):
-                summary_prompt = f"Summarize and explain this web result:\nTitle: {item.get('title')}\nURL: {item.get('href')}\nSnippet: {item.get('body')}"
-                active_thread["messages"].append({"role": "user", "content": f"🌐 Summarize: **{item.get('title')}**"})
-                reply = get_spark_reply("💬 Smart Chat & Vision", PERSONALITIES[selected_mood], summary_prompt, [summary_prompt])
-                active_thread["messages"].append(reply)
-                save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
-                st.rerun()
-            st.divider()
-
-# --- DISPLAY ACTIVE THREAD HISTORY ---
-for idx, msg in enumerate(active_thread["messages"]):
-    av = st.session_state.bot_avatar if msg["role"] == "assistant" else st.session_state.user_avatar
-    with st.chat_message(msg["role"], avatar=av):
-        if msg.get("image"):
-            st.image(msg["image"], width=320)
-        if msg.get("file_name"):
-            st.info(f"📎 Attached file: **{msg['file_name']}**")
-        st.markdown(msg["content"])
-        if msg.get("pptx_bytes"):
-            st.download_button(
-                label="📥 Download PowerPoint (.pptx)",
-                data=msg["pptx_bytes"],
-                file_name="Spark_Presentation.pptx",
-                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                key=f"dl_{st.session_state.current_thread_id}_{idx}"
-            )
-        if msg["role"] == "assistant" and msg.get("content"):
-            cache_key = f"{st.session_state.current_thread_id}_{idx}"
-            if st.button("🔊 Read Aloud", key=f"tts_{cache_key}"):
-                audio_bytes = text_to_speech(msg["content"], cache_key)
-                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-
-# --- ATTACHMENTS & VOICE EXPANDER ---
-with st.expander("📎 Attach Image / File or 🎙️ Record Voice", expanded=False):
-    col1, col2 = st.columns(2)
-    with col1:
-        uploaded_file = st.file_uploader(
-            "Upload Image or Document",
-            type=["png", "jpg", "jpeg", "webp", "pdf", "txt", "csv", "py", "md"]
-        )
-    with col2:
-        voice_audio = st.audio_input("Record Voice Message") if hasattr(st, "audio_input") else None
-
-# --- MAIN CHATBOX ---
-user_prompt = st.chat_input("Message Spark AI...")
-
-# --- PROCESS VOICE OR TEXT/FILE INPUT ---
-user_text = ""
-gemini_contents = []
-user_msg_record = {"role": "user", "content": ""}
-triggered = False
-
-if voice_audio is not None:
-    audio_bytes = voice_audio.getvalue()
-    if audio_bytes != st.session_state.last_processed_audio:
-        st.session_state.last_processed_audio = audio_bytes
-        triggered = True
-        user_text = "Voice message"
-        user_msg_record["content"] = "🎙️ *(Voice Message)*"
-        gemini_contents.append(
-            types.Part.from_bytes(data=audio_bytes, mime_type="audio/wav")
-        )
-
-elif user_prompt:
-    triggered = True
-    user_text = user_prompt
-    user_msg_record["content"] = user_text
-
-    if uploaded_file is not None:
-        user_msg_record["file_name"] = uploaded_file.name
-        file_bytes = uploaded_file.getvalue()
-
-        if uploaded_file.type.startswith("image/"):
-            img = Image.open(io.BytesIO(file_bytes))
-            user_msg_record["image"] = img
-            gemini_contents.append(img)
-        else:
-            gemini_contents.append(
-                types.Part.from_bytes(
-                    data=file_bytes,
-                    mime_type=uploaded_file.type or "application/pdf"
-                )
-            )
-
-    gemini_contents.append(user_text)
-
-# --- EXECUTE GEMINI CALL & SAVE ---
-if triggered:
-    active_thread["messages"].append(user_msg_record)
-    if active_thread["title"].startswith("New Chat ") and user_text:
-        active_thread["title"] = user_text[:30] + ("..." if len(user_text) > 30 else "")
-
-    with st.spinner("⚡ Spark is thinking..."):
         try:
-            reply_msg = get_spark_reply(
-                action_mode=action_mode,
-                system_instruction=PERSONALITIES[selected_mood],
-                user_text=user_text,
-                gemini_contents=gemini_contents
-            )
-            active_thread["messages"].append(reply_msg)
-            save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
-
-            if auto_read and reply_msg.get("content"):
-                new_idx = len(active_thread["messages"]) - 1
-                cache_key = f"{st.session_state.current_thread_id}_{new_idx}"
-                audio_out = text_to_speech(reply_msg["content"], cache_key)
-                st.audio(audio_out, format="audio/mp3", autoplay=True)
-
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error: {e}")
+            encoded_prompt = urllib.parse.quote(prompt_clean)
+            fallback_url = f"https://pollinations.ai{encoded_prompt}?width=1024&height=1024&nologo=true"
+            req = urllib.request.Request(fallback_url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=30) as resp:
+                gen_img = Image.open(io.BytesIO(resp.read()))
+                return {
+                    "role": "assistant",
+                    "content": f"Here is your generated image for: **{prompt_clean}**",
+                    "image": gen_img,
+                }
+        except Exception as fallback_err:
