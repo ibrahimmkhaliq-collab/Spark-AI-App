@@ -960,5 +960,5 @@ if triggered:
             st.audio(audio_out, format="audio/mp3", autoplay=True)
 
         st.rerun()
-    except Exception as e:
-    st.error(f"Error: {e}"
+    except Exception as e:        st.rerun()
+        st.error(f"Error: {e}")
