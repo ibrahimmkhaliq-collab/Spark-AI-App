@@ -762,11 +762,12 @@ st.caption(f"Current Mode: **{selected_mood}** | **{action_mode}**")
 
 # --- CUSTOM WEB SEARCH BROWSER ---
 with st.expander("🔍 Spark Custom Web Search Browser", expanded=False):
-        s_col1, s_col2 = st.columns([4, 1])
+    s_col1, s_col2 = st.columns()
     with s_col1:
         browser_query = st.text_input("Search the web directly inside Spark AI:", placeholder="Search news, sites, facts, tutorials...", label_visibility="collapsed")
     with s_col2:
         run_search = st.button("🔎 Search", type="primary", use_container_width=True)
+
 
     if run_search and browser_query.strip():
         with st.spinner("Searching the web..."):
