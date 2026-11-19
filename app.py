@@ -697,17 +697,32 @@ with st.sidebar:
         )
         st.rerun()
 
-    with st.expander("🎭 Customize Avatars (You & Spark)", expanded=False):
-        av_tab1, av_tab2 = st.tabs(["👤 Your Icon", "⚡ Spark Icon"])
+  # --- DISPLAY ACTIVE THREAD HISTORY ---
+for idx, msg in enumerate(active_thread["messages"]):
+    av = st.session_state.bot_avatar if msg["role"] == "assistant" else st.session_state.user_avatar
+    with st.chat_message(msg["role"], avatar=av):
+        if msg.get("image"):
+            st.image(msg["image"], width=420)
+        if msg.get("file_name"):
+            st.info(f"📎 Attached file: **{msg['file_name']}**")
+        st.markdown(msg["content"])
+        if msg.get("pptx_bytes"):
+            st.download_button(
+                label="📥 Download PowerPoint (.pptx)",
+                data=msg["pptx_bytes"],
+                file_name="Spark_Presentation.pptx",
+                mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                key=f"dl_{st.session_state.current_thread_id}_{idx}"
+            )
+        if msg["role"] == "assistant" and msg.get("content"):
+            cache_key = f"{st.session_state.current_thread_id}_{idx}"
+            if st.button("🔊 Read Aloud", key=f"tts_{cache_key}"):
+                audio_bytes = text_to_speech(msg["content"], cache_key)
+                st.audio(audio_bytes, format="audio/mp3", autoplay=True)
 
-        with av_tab1:# --- ATTACHMENTS & VOICE EXPANDER ---
+# --- ATTACHMENTS & VOICE EXPANDER ---
 with st.expander("📎 Attach Image / File or 🎙️ Record Voice", expanded=False):
-    col1, col2 = st.columns(2)
-    with col1:
-        uploaded_file = st.file_uploader(
-            "Upload Image or Document",
-            type=["png", "jpg", "jpeg", "webp", "pdf", "txt", "csv", "py", "md"]
-        )
+
     with col2:
         voice_audio = st.audio_input("Record Voice Message") if hasattr(st, "audio_input") else None
 
