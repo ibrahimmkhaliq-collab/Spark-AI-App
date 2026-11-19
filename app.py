@@ -28,10 +28,6 @@ if not api_key:
 client = genai.Client(api_key=api_key)
 
 PREFERRED_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-3.5-flash",
-    "gemini-3.5-flash-lite",
-    "gemini-4-hydrogen",
     "gemini-2.5-flash-lite",
     "gemini-2.5-flash",
 ]
@@ -914,23 +910,43 @@ if triggered:
     if active_thread["title"].startswith("New Chat ") and user_text:
         active_thread["title"] = user_text[:30] + ("..." if len(user_text) > 30 else "")
 
-    with st.spinner("⚡ Spark is thinking..."):
-        try:
-            reply_msg = get_spark_reply(
-                action_mode=action_mode,
-                system_instruction=PERSONALITIES[selected_mood],
-                user_text=user_text,
-                gemini_contents=gemini_contents
-            )
-            active_thread["messages"].append(reply_msg)
-            save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
+    raw_bot_av = st.session_state.bot_avatar
+    bot_av = get_valid_avatar(raw_bot_av, "⚡")
 
-            if auto_read and reply_msg.get("content"):
-                new_idx = len(active_thread["messages"]) - 1
-                cache_key = f"{st.session_state.current_thread_id}_{new_idx}"
-                audio_out = text_to_speech(reply_msg["content"], cache_key)
-                st.audio(audio_out, format="audio/mp3", autoplay=True)
+    try:
+        if action_mode == "💬 Smart Chat & Vision":
+            with st.chat_message("assistant", avatar=bot_av):
+                def stream_gemini():
+                    for chunk in client.models.generate_content_stream(
+                        model="gemini-2.5-flash",
+                        contents=gemini_contents,
+                        config=types.GenerateContentConfig(
+                            system_instruction=PERSONALITIES[selected_mood]
+                        ),
+                    ):
+                        if chunk.text:
+                            yield chunk.text
 
-            st.rerun()
-        except Exception as e:
-            st.error(f"Error: {e}")
+                full_reply = st.write_stream(stream_gemini())
+            reply_msg = {"role": "assistant", "content": full_reply}
+        else:
+            with st.spinner("⚡ Spark is working..."):
+                reply_msg = get_spark_reply(
+                    action_mode=action_mode,
+                    system_instruction=PERSONALITIES[selected_mood],
+                    user_text=user_text,
+                    gemini_contents=gemini_contents,
+                )
+
+        active_thread["messages"].append(reply_msg)
+        save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
+
+        if auto_read and reply_msg.get("content"):
+            new_idx = len(active_thread["messages"]) - 1
+            cache_key = f"{st.session_state.current_thread_id}_{new_idx}"
+            audio_out = text_to_speech(reply_msg["content"], cache_key)
+            st.audio(audio_out, format="audio/mp3", autoplay=True)
+
+        st.rerun()
+    except Exception as e:
+        st.error(f"Error: {e}")
