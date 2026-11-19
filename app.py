@@ -905,7 +905,6 @@ elif user_prompt:
             )
 
     gemini_contents.append(user_text)
-
 # --- EXECUTE GEMINI CALL & SAVE ---
 if triggered:
     active_thread["messages"].append(user_msg_record)
@@ -919,10 +918,10 @@ if triggered:
         if action_mode == "💬 Smart Chat & Vision":
             with st.chat_message("assistant", avatar=bot_av):
                 def stream_gemini():
-                    models = get_available_chat_models()
                     last_err = None
-                    for m_name in models:
+                    for m_name in PREFERRED_MODELS:
                         try:
+                            got_text = False
                             for chunk in client.models.generate_content_stream(
                                 model=m_name,
                                 contents=gemini_contents,
@@ -931,16 +930,17 @@ if triggered:
                                 ),
                             ):
                                 if chunk.text:
+                                    got_text = True
                                     yield chunk.text
-                            return
+                            if got_text:
+                                return
                         except Exception as e:
                             last_err = e
                             continue
-                    if last_err:
-                        raise last_err
+                    raise RuntimeError(f"All models failed: {last_err}")
 
                 full_reply = st.write_stream(stream_gemini())
-            reply_msg = {"role": "assistant", "content": full_reply}
+            reply_msg = {"role": "assistant", "content": str(full_reply)}
         else:
             with st.spinner("⚡ Spark is working..."):
                 reply_msg = get_spark_reply(
@@ -961,4 +961,4 @@ if triggered:
 
         st.rerun()
     except Exception as e:
-        st.error(f"Error: {e}")
+        st.error(f"Error: {e}"
