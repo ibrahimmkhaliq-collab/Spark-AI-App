@@ -596,4 +596,4 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
                     "content": f"Here is your generated image for: **{prompt_clean}**",
                     "image": gen_img,
                 }
-        except Exception as fallback_err:
+            except Exception as fallback_err:
