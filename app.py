@@ -918,45 +918,30 @@ if triggered:
         if action_mode == "💬 Smart Chat & Vision":
             with st.chat_message("assistant", avatar=bot_av):
                 def stream_gemini():
+                    models_to_try = PREFERRED_MODELS
+                    if st.session_state.get("fast_model") in models_to_try:
+                        fm = st.session_state["fast_model"]
+                        models_to_try = [fm] + [m for m in models_to_try if m != fm]
+
                     last_err = None
-                    for m_name in PREFERRED_MODELS:
+                    for m_name in models_to_try:
                         try:
                             got_text = False
                             for chunk in client.models.generate_content_stream(
                                 model=m_name,
                                 contents=gemini_contents,
                                 config=types.GenerateContentConfig(
-                                    system_instruction=PERSONALITIES[selected_mood]
+                                    system_instruction=PERSONALITIES[selected_mood],
+                                    thinking_config=types.ThinkingConfig(thinking_budget=0),
                                 ),
                             ):
                                 if chunk.text:
                                     got_text = True
                                     yield chunk.text
                             if got_text:
+                                st.session_state["fast_model"] = m_name
                                 return
                         except Exception as e:
                             last_err = e
                             continue
-                    raise RuntimeError(f"All models failed: {last_err}")
-
-                full_reply = st.write_stream(stream_gemini())
-            reply_msg = {"role": "assistant", "content": str(full_reply)}
-        else:
-            with st.spinner("⚡ Spark is working..."):
-                reply_msg = get_spark_reply(
-                    action_mode=action_mode,
-                    system_instruction=PERSONALITIES[selected_mood],
-                    user_text=user_text,
-                    gemini_contents=gemini_contents,
-                )
-
-        active_thread["messages"].append(reply_msg)
-        save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
-
-        if auto_read and reply_msg.get("content"):
-            new_idx = len(active_thread["messages"]) - 1
-            cache_key = f"{st.session_state.current_thread_id}_{new_idx}"
-            audio_out = text_to_speech(reply_msg["content"], cache_key)
-            st.rerun(2)
-    except Exception as e:
-        st.error(f"Error: {e}")
+                    raise RuntimeError(f"All models failed: {last_err}")                
