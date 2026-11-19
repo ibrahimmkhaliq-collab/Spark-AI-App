@@ -961,4 +961,4 @@ if triggered:
 
         st.rerun()
     except Exception as e:
-        st.error(f"Error: {e}"
+    st.error(f"Error: {e}"
