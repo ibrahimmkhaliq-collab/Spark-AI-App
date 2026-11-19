@@ -907,9 +907,9 @@ elif user_prompt:
     gemini_contents.append(user_text)
     
     def build_chat_history_contents(messages, current_turn_parts):
-    history_contents = []
-    # Include the last 20 messages for memory without slowing down requests
-    for m in messages[-20:]:
+        history_contents = []
+        # Include the last 20 messages for memory without slowing down requests
+        for m in messages[-20:]:
         role = "model" if m["role"] == "assistant" else "user"
         text_val = (m.get("content") or "").strip()
         if text_val:
