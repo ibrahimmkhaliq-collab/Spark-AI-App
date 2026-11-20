@@ -36,19 +36,6 @@ PREFERRED_MODELS = [
 def get_available_chat_models():
     return PREFERRED_MODELS
 
-    blocked = ("image", "tts", "live", "embed", "aqa", "vision", "pro", "research", "computer", "robotics", "thinking")
-    try:
-        available = [
-            m.name.removeprefix("models/")
-            for m in client.models.list()
-            if "gemini" in m.name and not any(b in m.name.lower() for b in blocked)
-        ]
-        ordered = [m for m in PREFERRED_MODELS if m in available]
-        others = [m for m in available if m not in ordered]
-        return (ordered + others)[:4] if (ordered or others) else PREFERRED_MODELS[:3]
-    except Exception:
-        return PREFERRED_MODELS[:3]
-
 supabase = None
 supa_url = st.secrets.get("SUPABASE_URL") or os.environ.get("SUPABASE_URL")
 supa_key = st.secrets.get("SUPABASE_KEY") or os.environ.get("SUPABASE_KEY")
@@ -255,6 +242,7 @@ st.markdown(f"""
     }}
 </style>
 """, unsafe_allow_html=True)
+
 if not st.session_state.user_email:
     col_l, col_mid, col_r = st.columns([1, 1.4, 1])
     with col_mid:
@@ -285,9 +273,6 @@ if not st.session_state.user_email:
                         if res.session:
                             st.query_params["rt"] = res.session.refresh_token
                         st.rerun()
-                    except Exception as e:
-                        st.error(f"Login failed: {e}")
-
         with auth_tab2:
             reg_email = st.text_input("Email", key="reg_email")
             reg_pass = st.text_input("Password (min 6 chars)", type="password", key="reg_pass")
@@ -537,15 +522,17 @@ def generate_chart_image(chart_spec):
     buf.seek(0)
     return Image.open(buf)
 
-def text_to_speech(text, cache_key):
-    if cache_key not in st.session_state.audio_cache:
+def text_to_speech(text, cache_key, voice_gender="Female"):
+    full_cache_key = f"{cache_key}_{voice_gender}"
+    if full_cache_key not in st.session_state.audio_cache:
         clean_text = text.replace("*", "").replace("#", "").replace("`", "")
-        tts = gTTS(text=clean_text[:1500], lang="en")
+        tts_tld = "co.uk" if voice_gender == "Male" else "com"
+        tts = gTTS(text=clean_text[:1500], lang="en", tld=tts_tld)
         fp = io.BytesIO()
         tts.write_to_fp(fp)
         fp.seek(0)
-        st.session_state.audio_cache[cache_key] = fp.getvalue()
-    return st.session_state.audio_cache[cache_key]
+        st.session_state.audio_cache[full_cache_key] = fp.getvalue()
+    return st.session_state.audio_cache[full_cache_key]
 
 def generate_with_fallback(contents, config):
     models_to_try = get_available_chat_models()
@@ -680,7 +667,6 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
         config=types.GenerateContentConfig(system_instruction=system_instruction)
     )
     return {"role": "assistant", "content": response.text}
-
 # --- SIDEBAR CONTROLS & CHAT THREADS ---
 with st.sidebar:
     st.title("⚡ Spark AI")
@@ -797,8 +783,8 @@ with st.sidebar:
         ]
     )
     st.divider()
+    voice_gender = st.selectbox("🎙️ Spark's Voice:", ["Female", "Male"])
     auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
-
 # --- MAIN HEADER ---
 st.title(f"⚡ {active_thread['title']}")
 st.caption(f"Current Mode: **{selected_mood}** | **{action_mode}**")
@@ -849,7 +835,7 @@ for idx, msg in enumerate(active_thread["messages"]):
         if msg["role"] == "assistant" and msg.get("content"):
             cache_key = f"{st.session_state.current_thread_id}_{idx}"
             if st.button("🔊 Read Aloud", key=f"tts_{cache_key}"):
-                audio_bytes = text_to_speech(msg["content"], cache_key)
+                audio_bytes = text_to_speech(msg["content"], cache_key, voice_gender)
                 st.audio(audio_bytes, format="audio/mp3", autoplay=True)
 
 # --- ATTACHMENTS & VOICE EXPANDER ---
@@ -865,6 +851,32 @@ with st.expander("📎 Attach Image / File or 🎙️ Record Voice", expanded=Fa
 
 # --- MAIN CHATBOX ---
 user_prompt = st.chat_input("Message Spark AI...")
+
+def build_chat_history_contents(messages, current_turn_parts):
+    history_contents = []
+    for m in messages[-20:]:
+        role = "model" if m["role"] == "assistant" else "user"
+        text = m.get("content", "")
+        if text:
+            history_contents.append(
+                types.Content(role=role, parts=[types.Part.from_text(text=text)])
+            )
+    clean_parts = []
+    for p in current_turn_parts:
+        if isinstance(p, str):
+            if p.strip():
+                clean_parts.append(types.Part.from_text(text=p))
+        elif isinstance(p, types.Part):
+            clean_parts.append(p)
+        elif p is not None:
+            buf = io.BytesIO()
+            p.save(buf, format="PNG")
+            clean_parts.append(types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"))
+    if clean_parts:
+        history_contents.append(
+            types.Content(role="user", parts=clean_parts)
+        )
+    return history_contents
 
 # --- PROCESS VOICE OR TEXT/FILE INPUT ---
 user_text = ""
@@ -905,34 +917,7 @@ elif user_prompt:
             )
 
     gemini_contents.append(user_text)
-    
-    def build_chat_history_contents(messages, current_turn_parts):
-        history_contents = []
-        # Send the last 20 messages so Spark remembers the full conversation
-        for m in messages[-20:]:
-            role = "model" if m["role"] == "assistant" else "user"
-            text = m.get("content", "")
-            if text:
-                history_contents.append(
-                    types.Content(role=role, parts=[types.Part.from_text(text=text)])
-                )
-            clean_parts = []
-        for p in current_turn_parts:
-            if isinstance(p, str):
-                if p.strip():
-                    clean_parts.append(types.Part.from_text(text=p))
-            elif isinstance(p, types.Part):
-                clean_parts.append(p)
-            elif p is not None:
-                buf = io.BytesIO()
-                p.save(buf, format="PNG")
-                clean_parts.append(types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"))
-        if clean_parts:
-            history_contents.append(
-                types.Content(role="user", parts=clean_parts)
-            )
 
-        return history_contents
 # --- EXECUTE GEMINI CALL & SAVE ---
 if triggered:
     full_contents = build_chat_history_contents(active_thread["messages"], gemini_contents)
@@ -941,7 +926,7 @@ if triggered:
         active_thread["title"] = user_text[:30] + ("..." if len(user_text) > 30 else "")
 
     raw_bot_av = st.session_state.bot_avatar
-    bot_av = get_valid_avatar(raw_bot_av, "⚡")                
+    bot_av = get_valid_avatar(raw_bot_av, "⚡")
     try:
         if action_mode == "💬 Smart Chat & Vision":
             if "live_flash_models" not in st.session_state:
@@ -985,17 +970,18 @@ if triggered:
                             continue
                     raise RuntimeError(f"Could not generate reply: {last_err}")
 
-            full_reply = st.write_stream(stream_gemini())
-            reply_msg = {"role": "assistant", "content": str(full_reply)}
-    else:  
-                with st.spinner("⚡ Spark is working..."):
-                    reply_msg = get_spark_reply(
-                        action_mode=action_mode,
-                        system_instruction=PERSONALITIES[selected_mood],
-                        user_text=user_text,
-                        gemini_contents=full_contents,)
-    active_thread["messages"].append(reply_msg)
-    save_profile_to_supabase(st.session_state["user_email"])
-    st.rerun() 
-        except Exception as e:
-            st.error(f"Error: {e}")
+                full_reply = st.write_stream(stream_gemini())
+                reply_msg = {"role": "assistant", "content": str(full_reply)}
+        else:
+            with st.spinner("⚡ Spark is working..."):
+                reply_msg = get_spark_reply(
+                    action_mode=action_mode,
+                    system_instruction=PERSONALITIES[selected_mood],
+                    user_text=user_text,
+                    gemini_contents=full_contents,
+                )
+        active_thread["messages"].append(reply_msg)
+        save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
+        st.rerun()
+    except Exception as e:
+        st.error(f"Error: {e}")
