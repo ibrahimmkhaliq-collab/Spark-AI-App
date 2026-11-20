@@ -531,7 +531,7 @@ def text_to_speech(text, cache_key, voice_gender="Female"):
     full_cache_key = f"{cache_key}_{voice_gender}"
     if full_cache_key not in st.session_state.audio_cache:
         clean_text = text.replace("*", "").replace("#", "").replace("`", "")[:1500]
-        voice_name = "en-US-Christopher" if voice_gender == "Male" else "en-US-AvaNeural"
+        voice_name = "en-US-ChristopherNeural" if voice_gender == "Male" else "en-US-JennyNeural"
 
         async def _synthesize():
             communicate = edge_tts.Communicate(clean_text, voice_name)
