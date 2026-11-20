@@ -604,27 +604,40 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
     if action_mode == "🎨 Generate AI Image":
         prompt_clean = (user_text or "A futuristic glowing spark").strip()
         image_models = [
-            "gemini-3.1-flash-image-preview",
             "gemini-2.5-flash-image",
-            "gemini-3-pro-image-preview",
+            "imagen-3.0-generate-002",
         ]
         last_img_err = ""
         for img_model in image_models:
             try:
-                res = client.models.generate_content(
-                    model=img_model,
-                    contents=prompt_clean,
-                    config=types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"]),
-                )
-                if res.candidates and res.candidates[0].content.parts:
-                    for part in res.candidates[0].content.parts:
-                        if part.inline_data and part.inline_data.data:
-                            gen_img = Image.open(io.BytesIO(part.inline_data.data))
-                            return {
-                                "role": "assistant",
-                                "content": f"Here is your generated image for: **{prompt_clean}**",
-                                "image": gen_img,
-                            }
+                if img_model.startswith("imagen"):
+                    res = client.models.generate_images(
+                        model=img_model,
+                        prompt=prompt_clean,
+                        config=types.GenerateImagesConfig(number_of_images=1, output_mime_type="image/png"),
+                    )
+                    if res.generated_images:
+                        gen_img = Image.open(io.BytesIO(res.generated_images[0].image.image_bytes))
+                        return {
+                            "role": "assistant",
+                            "content": f"Here is your generated image for: **{prompt_clean}**",
+                            "image": gen_img,
+                        }
+                else:
+                    res = client.models.generate_content(
+                        model=img_model,
+                        contents=prompt_clean,
+                        config=types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"]),
+                    )
+                    if res.candidates and res.candidates[0].content.parts:
+                        for part in res.candidates[0].content.parts:
+                            if part.inline_data and part.inline_data.data:
+                                gen_img = Image.open(io.BytesIO(part.inline_data.data))
+                                return {
+                                    "role": "assistant",
+                                    "content": f"Here is your generated image for: **{prompt_clean}**",
+                                    "image": gen_img,
+                                }
             except Exception as e:
                 last_img_err = str(e)
                 continue
