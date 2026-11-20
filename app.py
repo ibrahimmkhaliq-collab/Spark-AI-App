@@ -993,7 +993,7 @@ if triggered:
                         action_mode=action_mode,
                         system_instruction=PERSONALITIES[selected_mood],
                         user_text=user_text,
-                        gemini_contents=full_contents,
+                        gemini_contents=full_contents,)
             active_thread["messages"].append(reply_msg)
             save_profile_to_supabase(st.session_state["user_email"])
             st.rerun()
