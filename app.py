@@ -260,21 +260,21 @@ if not st.session_state.user_email:
         auth_tab1, auth_tab2, auth_tab3 = st.tabs(["🔐 Sign In", "✨ Create Account", "🚀 Guest Mode"])
         
         with auth_tab1:
-        login_email = st.text_input("Email", key="login_email")
-        login_pass = st.text_input("Password", type="password", key="login_pass")
-        if st.button("Sign In", type="primary", use_container_width=True):
-            if not supabase:
-                st.error("Supabase keys are missing in Secrets.")
-            elif login_email and login_pass:
-                try:
-                    res = supabase.auth.sign_in_with_password({"email": login_email, "password": login_pass})
-                    st.session_state.user_email = res.user.email
-                    st.session_state.pop("profile_loaded", None)
-                    if res.session:
-                        st.query_params["rt"] = res.session.refresh_token
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Login failed: {e}")
+            login_email = st.text_input("Email", key="login_email")
+            login_pass = st.text_input("Password", type="password", key="login_pass")
+            if st.button("Sign In", type="primary", use_container_width=True):
+                if not supabase:
+                    st.error("Supabase keys are missing in Secrets.")
+                elif login_email and login_pass:
+                    try:
+                        res = supabase.auth.sign_in_with_password({"email": login_email, "password": login_pass})
+                        st.session_state.user_email = res.user.email
+                        st.session_state.pop("profile_loaded", None)
+                        if res.session:
+                            st.query_params["rt"] = res.session.refresh_token
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Login failed: {e}")
 
         with auth_tab2:
 
