@@ -916,20 +916,20 @@ elif user_prompt:
                 history_contents.append(
                     types.Content(role=role, parts=[types.Part.from_text(text=text)])
                 )
-               clean_parts = []
-        for p in current_turn_parts:
-            if isinstance(p, str):
-                if p.strip():
-                    clean_parts.append(types.Part.from_text(text=p))
-            elif isinstance(p, types.Part):
-                clean_parts.append(p)
-            elif p is not None:
-                buf = io.BytesIO()
-                p.save(buf, format="PNG")
-                clean_parts.append(types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"))
-        if clean_parts:
-            history_contents.append(
-                types.Content(role="user", parts=clean_parts)
+                   clean_parts = []
+            for p in current_turn_parts:
+                if isinstance(p, str):
+                    if p.strip():
+                        clean_parts.append(types.Part.from_text(text=p))
+                elif isinstance(p, types.Part):
+                    clean_parts.append(p)
+                elif p is not None:
+                    buf = io.BytesIO()
+                    p.save(buf, format="PNG")
+                    clean_parts.append(types.Part.from_bytes(data=buf.getvalue(), mime_type="image/png"))
+            if clean_parts:
+                history_contents.append(
+                    types.Content(role="user", parts=clean_parts)
             )
         return history_contents
 # --- EXECUTE GEMINI CALL & SAVE ---
