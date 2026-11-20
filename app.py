@@ -600,12 +600,13 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
             config=types.GenerateContentConfig(system_instruction=system_instruction)
         )
         return {"role": "assistant", "content": response.text}
-    if action_mode == "🎨 Generate AI Image":
+        if action_mode == "🎨 Generate AI Image":
         prompt_clean = (user_text or "A futuristic glowing spark").strip()
         image_models = [
+            "gemini-nano-banana-2.1",
+            "gemini-3.1-flash-image",
+            "gemini-3.1-flash-lite-image",
             "gemini-2.5-flash-image",
-            "gemini-2.0-flash-exp-image-generation",
-            "gemini-2.0-flash-preview-image-generation",
         ]
         last_img_err = ""
         for img_model in image_models:
@@ -630,8 +631,8 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
 
         try:
             encoded_prompt = urllib.parse.quote(prompt_clean)
-            fallback_url = f"https://pollinations.ai{encoded_prompt}?width=1024&height=1024&nologo=true&seed={uuid.uuid4().int % 100000}"
-            req = urllib.request.Request(fallback_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+            fallback_url = f"https://pollinations.ai{encoded_prompt}?width=1024&height=1024&nologo=true"
+            req = urllib.request.Request(fallback_url, headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=45) as resp:
                 gen_img = Image.open(io.BytesIO(resp.read()))
                 return {
