@@ -972,8 +972,8 @@ if triggered:
                             continue
                     raise RuntimeError(f"Could not generate reply: {last_err}")
 
-                                full_reply = st.write_stream(stream_gemini())
-                    reply_msg = {"role": "assistant", "content": str(full_reply)}
+                    full_reply = st.write_stream(stream_gemini())
+        reply_msg = {"role": "assistant", "content": str(full_reply)}
             else:
                 with st.spinner("⚡ Spark is working..."):
                     reply_msg = get_spark_reply(
