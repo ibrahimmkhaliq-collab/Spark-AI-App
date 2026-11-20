@@ -987,7 +987,7 @@ if triggered:
 
             full_reply = st.write_stream(stream_gemini())
             reply_msg = {"role": "assistant", "content": str(full_reply)}
-        else:  
+            else:  
                 with st.spinner("⚡ Spark is working..."):
                     reply_msg = get_spark_reply(
                         action_mode=action_mode,
@@ -996,6 +996,6 @@ if triggered:
                         gemini_contents=full_contents,)
             active_thread["messages"].append(reply_msg)
             save_profile_to_supabase(st.session_state["user_email"])
-            st.rerun()
+            st.rerun() 
         except Exception as e:
             st.error(f"Error: {e}")
