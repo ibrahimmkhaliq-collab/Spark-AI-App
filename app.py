@@ -916,7 +916,7 @@ elif user_prompt:
                 history_contents.append(
                     types.Content(role=role, parts=[types.Part.from_text(text=text)])
                 )
-                  clean_parts = []
+            clean_parts = []
         for p in current_turn_parts:
             if isinstance(p, str):
                 if p.strip():
