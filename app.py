@@ -974,13 +974,12 @@ if triggered:
 
             full_reply = st.write_stream(stream_gemini())
             reply_msg = {"role": "assistant", "content": str(full_reply)}
-        else: 
+        else:  
                 with st.spinner("⚡ Spark is working..."):
                     reply_msg = get_spark_reply(
                         action_mode=action_mode,
                         system_instruction=PERSONALITIES[selected_mood],
                         user_text=user_text,
                         gemini_contents=full_contents,
-                    )
-        except Exception as e:
-            st.error(f"Error: {e}")
+                    except Exception as e:
+                        st.error(f"Error: {e}")
