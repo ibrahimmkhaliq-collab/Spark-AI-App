@@ -3,7 +3,7 @@ google-genai
 supabase
 pillow
 python-pptx
-gTTS
+edge-tts
 emoji
 duckduckgo-search
 matplotlib
