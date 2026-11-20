@@ -527,14 +527,26 @@ def generate_chart_image(chart_spec):
     buf.seek(0)
     return Image.open(buf)
 
-def text_to_speech(text, cache_key, voice_gender="Female"):
-    full_cache_key = f"{cache_key}_{voice_gender}"
+SPARK_VOICES = {
+    "👩 Female": {
+        "🌸 Jenny — Warm & Friendly (US)": "en-US-JennyNeural",
+        "✨ Aria — Bright & Expressive (US)": "en-US-AriaNeural",
+        "👑 Sonia — Calm & Polished (UK)": "en-GB-SoniaNeural",
+    },
+    "👨 Male": {
+        "🦁 Christopher — Deep & Authoritative (US)": "en-US-ChristopherNeural",
+        "🎧 Guy — Natural & Conversational (US)": "en-US-GuyNeural",
+        "⚡ Ryan — Crisp & Energetic (UK)": "en-GB-RyanNeural",
+    },
+}
+
+def text_to_speech(text, cache_key, voice_id="en-US-JennyNeural"):
+    full_cache_key = f"{cache_key}_{voice_id}"
     if full_cache_key not in st.session_state.audio_cache:
         clean_text = text.replace("*", "").replace("#", "").replace("`", "")[:1500]
-        voice_name = "en-US-ChristopherNeural" if voice_gender == "Male" else "en-US-JennyNeural"
 
         async def _synthesize():
-            communicate = edge_tts.Communicate(clean_text, voice_name)
+            communicate = edge_tts.Communicate(clean_text, voice_id)
             audio_chunks = bytearray()
             async for chunk in communicate.stream():
                 if chunk["type"] == "audio":
@@ -547,6 +559,7 @@ def text_to_speech(text, cache_key, voice_gender="Female"):
         finally:
             loop.close()
     return st.session_state.audio_cache[full_cache_key]
+
 
 
 def generate_with_fallback(contents, config):
@@ -798,7 +811,10 @@ with st.sidebar:
         ]
     )
     st.divider()
-    voice_gender = st.selectbox("🎙️ Spark's Voice:", ["Female", "Male"])
+        selected_gender = st.radio("🎙️ Voice Gender:", list(SPARK_VOICES.keys()), horizontal=True)
+    selected_voice_label = st.selectbox("🗣️ Voice & Vibe:", list(SPARK_VOICES[selected_gender].keys()))
+    voice_gender = SPARK_VOICES[selected_gender][selected_voice_label]
+
     auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
 # --- MAIN HEADER ---
 st.title(f"⚡ {active_thread['title']}")
