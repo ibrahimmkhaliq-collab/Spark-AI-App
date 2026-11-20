@@ -8,6 +8,7 @@ from gtts import gTTS
 from duckduckgo_search import DDGS
 import matplotlib.pyplot as plt
 import base64
+import asyncio
 import io
 import json
 import os
