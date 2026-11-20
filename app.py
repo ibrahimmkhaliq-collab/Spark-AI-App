@@ -9,6 +9,7 @@ from duckduckgo_search import DDGS
 import matplotlib.pyplot as plt
 import base64
 import asyncio
+import edge_tts
 import io
 import json
 import os
