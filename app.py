@@ -928,8 +928,7 @@ if triggered:
         active_thread["title"] = user_text[:30] + ("..." if len(user_text) > 30 else "")
 
     raw_bot_av = st.session_state.bot_avatar
-    bot_av = get_valid_avatar(raw_bot_av, "⚡")
-
+    bot_av = get_valid_avatar(raw_bot_av, "⚡")                
     try:
         if action_mode == "💬 Smart Chat & Vision":
             if "live_flash_models" not in st.session_state:
@@ -983,5 +982,5 @@ if triggered:
                     user_text=user_text,
                     gemini_contents=full_contents,
                 )
-            except Exception as e:
+        except Exception as e:
             st.error(f"Error: {e}")
