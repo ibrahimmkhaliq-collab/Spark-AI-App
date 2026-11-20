@@ -258,6 +258,7 @@ if not st.session_state.user_email:
         st.title("⚡ Welcome to Spark AI")
         st.caption("Sign in to access your private AI workspace & synced chat threads.")
         auth_tab1, auth_tab2, auth_tab3 = st.tabs(["🔐 Sign In", "✨ Create Account", "🚀 Guest Mode"])
+        
             with auth_tab1:
             login_email = st.text_input("Email", key="login_email")
             login_pass = st.text_input("Password", type="password", key="login_pass")
