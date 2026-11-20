@@ -259,7 +259,7 @@ if not st.session_state.user_email:
         st.caption("Sign in to access your private AI workspace & synced chat threads.")
         auth_tab1, auth_tab2, auth_tab3 = st.tabs(["🔐 Sign In", "✨ Create Account", "🚀 Guest Mode"])
 
-        with auth_tab1:
+               with auth_tab1:
             login_email = st.text_input("Email", key="login_email")
             login_pass = st.text_input("Password", type="password", key="login_pass")
             if st.button("Sign In", type="primary", use_container_width=True):
@@ -273,8 +273,11 @@ if not st.session_state.user_email:
                         if res.session:
                             st.query_params["rt"] = res.session.refresh_token
                         st.rerun()
+                    except Exception as e:
+                        st.error(f"Login failed: {e}")
+
         with auth_tab2:
-            reg_email = st.text_input("Email", key="reg_email")
+
             reg_pass = st.text_input("Password (min 6 chars)", type="password", key="reg_pass")
             if st.button("Create Account", type="primary", use_container_width=True):
                 if not supabase:
