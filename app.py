@@ -980,6 +980,6 @@ if triggered:
                         action_mode=action_mode,
                         system_instruction=PERSONALITIES[selected_mood],
                         user_text=user_text,
-                        gemini_contents=full_contents,
+                        gemini_contents=full_contents,)
                     except Exception as e:
                         st.error(f"Error: {e}")
