@@ -528,14 +528,24 @@ def generate_chart_image(chart_spec):
 def text_to_speech(text, cache_key, voice_gender="Female"):
     full_cache_key = f"{cache_key}_{voice_gender}"
     if full_cache_key not in st.session_state.audio_cache:
-        clean_text = text.replace("*", "").replace("#", "").replace("`", "")
-        tts_tld = "co.uk" if voice_gender == "Male" else "com"
-        tts = gTTS(text=clean_text[:1500], lang="en", tld=tts_tld)
-        fp = io.BytesIO()
-        tts.write_to_fp(fp)
-        fp.seek(0)
-        st.session_state.audio_cache[full_cache_key] = fp.getvalue()
+        clean_text = text.replace("*", "").replace("#", "").replace("`", "")[:1500]
+        voice_name = "en-US-AndrewNeural" if voice_gender == "Male" else "en-US-AvaNeural"
+
+        async def _synthesize():
+            communicate = edge_tts.Communicate(clean_text, voice_name)
+            audio_chunks = bytearray()
+            async for chunk in communicate.stream():
+                if chunk["type"] == "audio":
+                    audio_chunks.extend(chunk["data"])
+            return bytes(audio_chunks)
+
+        loop = asyncio.new_event_loop()
+        try:
+            st.session_state.audio_cache[full_cache_key] = loop.run_until_complete(_synthesize())
+        finally:
+            loop.close()
     return st.session_state.audio_cache[full_cache_key]
+
 
 def generate_with_fallback(contents, config):
     models_to_try = get_available_chat_models()
