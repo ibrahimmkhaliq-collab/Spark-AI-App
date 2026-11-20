@@ -811,10 +811,9 @@ with st.sidebar:
         ]
     )
     st.divider()
-        selected_gender = st.radio("🎙️ Voice Gender:", list(SPARK_VOICES.keys()), horizontal=True)
+    selected_gender = st.radio("🎙️ Voice Gender:", list(SPARK_VOICES.keys()), horizontal=True)
     selected_voice_label = st.selectbox("🗣️ Voice & Vibe:", list(SPARK_VOICES[selected_gender].keys()))
     voice_gender = SPARK_VOICES[selected_gender][selected_voice_label]
-
     auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
 # --- MAIN HEADER ---
 st.title(f"⚡ {active_thread['title']}")
