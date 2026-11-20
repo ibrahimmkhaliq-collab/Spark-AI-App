@@ -981,5 +981,5 @@ if triggered:
                         system_instruction=PERSONALITIES[selected_mood],
                         user_text=user_text,
                         gemini_contents=full_contents,)
-                    except Exception as e:
-                        st.error(f"Error: {e}")
+    except Exception as e:
+        st.error(f"Error: {e}")
