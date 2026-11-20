@@ -600,53 +600,39 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
             config=types.GenerateContentConfig(system_instruction=system_instruction)
         )
         return {"role": "assistant", "content": response.text}
-
     if action_mode == "🎨 Generate AI Image":
         prompt_clean = (user_text or "A futuristic glowing spark").strip()
         image_models = [
             "gemini-2.5-flash-image",
-            "imagen-3.0-generate-002",
+            "gemini-2.0-flash-exp-image-generation",
+            "gemini-2.0-flash-preview-image-generation",
         ]
         last_img_err = ""
         for img_model in image_models:
             try:
-                if img_model.startswith("imagen"):
-                    res = client.models.generate_images(
-                        model=img_model,
-                        prompt=prompt_clean,
-                        config=types.GenerateImagesConfig(number_of_images=1, output_mime_type="image/png"),
-                    )
-                    if res.generated_images:
-                        gen_img = Image.open(io.BytesIO(res.generated_images[0].image.image_bytes))
-                        return {
-                            "role": "assistant",
-                            "content": f"Here is your generated image for: **{prompt_clean}**",
-                            "image": gen_img,
-                        }
-                else:
-                    res = client.models.generate_content(
-                        model=img_model,
-                        contents=prompt_clean,
-                        config=types.GenerateContentConfig(response_modalities=["TEXT", "IMAGE"]),
-                    )
-                    if res.candidates and res.candidates[0].content.parts:
-                        for part in res.candidates[0].content.parts:
-                            if part.inline_data and part.inline_data.data:
-                                gen_img = Image.open(io.BytesIO(part.inline_data.data))
-                                return {
-                                    "role": "assistant",
-                                    "content": f"Here is your generated image for: **{prompt_clean}**",
-                                    "image": gen_img,
-                                }
+                res = client.models.generate_content(
+                    model=img_model,
+                    contents=f"Generate an image of: {prompt_clean}",
+                    config=types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"]),
+                )
+                if res.candidates and res.candidates.content.parts:
+                    for part in res.candidates.content.parts:
+                        if part.inline_data and part.inline_data.data:
+                            gen_img = Image.open(io.BytesIO(part.inline_data.data))
+                            return {
+                                "role": "assistant",
+                                "content": f"Here is your generated image for: **{prompt_clean}**",
+                                "image": gen_img,
+                            }
             except Exception as e:
                 last_img_err = str(e)
                 continue
 
         try:
             encoded_prompt = urllib.parse.quote(prompt_clean)
-            fallback_url = f"https://pollinations.ai{encoded_prompt}?width=1024&height=1024&nologo=true"
-            req = urllib.request.Request(fallback_url, headers={"User-Agent": "Mozilla/5.0"})
-            with urllib.request.urlopen(req, timeout=30) as resp:
+            fallback_url = f"https://pollinations.ai{encoded_prompt}?width=1024&height=1024&nologo=true&seed={uuid.uuid4().int % 100000}"
+            req = urllib.request.Request(fallback_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"})
+            with urllib.request.urlopen(req, timeout=45) as resp:
                 gen_img = Image.open(io.BytesIO(resp.read()))
                 return {
                     "role": "assistant",
@@ -655,7 +641,6 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
                 }
         except Exception as fallback_err:
             raise RuntimeError(f"Image generation failed ({last_img_err or fallback_err}).")
-
     if action_mode == "📊 Build Presentation Slide":
         ppt_prompt = (
             f"Create a 5-slide presentation about: {user_text}. "
