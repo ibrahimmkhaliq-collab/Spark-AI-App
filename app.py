@@ -286,7 +286,7 @@ if not st.session_state.user_email:
                     st.error("Supabase keys are missing in Secrets.")
                 elif reg_email and len(reg_pass) >= 6:
                     auth_email = reg_email.strip() if "@" in reg_email else f"{reg_email.strip().lower()}@sparkchat.local"
-                    try:
+                                        try:
                         res = supabase.auth.sign_up({"email": auth_email, "password": reg_pass})
                         if res.user:
                             st.session_state.user_email = res.user.email
@@ -295,11 +295,9 @@ if not st.session_state.user_email:
                                 st.query_params["rt"] = res.session.refresh_token
                             st.success("Account created! Loading Spark AI...")
                             st.rerun()
-                                        except Exception as e:
+                    except Exception as e:
                         st.error(f"Sign up failed: {e}")
                 else:
-                    st.warning("Enter a valid username/email and a password with at least 6 characters.")
-
                     st.warning("Enter a valid username/email and a password with at least 6 characters.")
         with auth_tab3:
             st.info("Try Spark AI without saving threads to the cloud.")
