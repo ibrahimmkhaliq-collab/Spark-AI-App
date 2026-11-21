@@ -800,8 +800,8 @@ with st.sidebar:
             st.session_state.current_thread_id = next(iter(st.session_state.threads))
             st.rerun()
 
-    st.divider()
-        selected_mood = st.selectbox("Spark's Focus Mode:", list(PERSONALITIES.keys()))
+        st.divider()
+    selected_mood = st.selectbox("Spark's Focus Mode:", list(PERSONALITIES.keys()))
     action_mode = st.radio(
         "Action Mode:",
         [
@@ -814,7 +814,6 @@ with st.sidebar:
         ]
     )
     st.divider()
-    selected_gender = st.radio("🎙️ Voice Gender:", list(SPARK_VOICES.keys()), horizontal=True)
     selected_voice_label = st.selectbox("🗣️ Voice & Vibe:", list(SPARK_VOICES[selected_gender].keys()))
     voice_gender = SPARK_VOICES[selected_gender][selected_voice_label]
     auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
