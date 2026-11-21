@@ -818,86 +818,145 @@ with st.sidebar:
     selected_voice_label = st.selectbox("🗣️ Voice & Vibe:", list(SPARK_VOICES[selected_gender].keys()))
     voice_gender = SPARK_VOICES[selected_gender][selected_voice_label]
     auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
-
-# --- LIVE FRIEND CHAT MODE ---
+# --- LIVE FRIEND CHAT MODE (WHATSAPP-STYLE GROUPS) ---
 if action_mode == "👥 Live Friend Chat":
-    st.title("👥 Spark Live Friend Chat")
+    st.title("👥 Spark Friend Groups")
     if not supabase or st.session_state.user_email == "guest@local":
-        st.warning("⚠️ Sign in with an account (not Guest Mode) to join or create friend rooms.")
+        st.warning("⚠️ Sign in with an account (not Guest Mode) to create or join friend groups.")
         st.stop()
 
     my_email = st.session_state.user_email
-    default_nick = my_email.split("@")[0]
+    default_nick = my_email.split("@")
+    display_name = st.text_input("🏷️ Your Display Name:", value=default_nick).strip() or default_nick
 
-    c1, c2, c3 = st.columns([1.2, 1.2, 0.8])
-    with c1:
-        room_code = st.text_input("🔑 Room Code:", value="general").strip().lower() or "general"
-    with c2:
-        display_name = st.text_input("🏷️ Your Nickname:", value=default_nick).strip() or default_nick
-    with c3:
+    # Top Bar: Create New Group OR Join Existing Group with Invite Code
+    tab_create, tab_join = st.tabs(["➕ Create New Group", "🔑 Join Group with Invite Code"])
+    with tab_create:
+        cg1, cg2 = st.columns([2, 1])
+        with cg1:
+            new_grp_name = st.text_input("Group Name (e.g., Football Squad):", key="new_grp_name")
+        with cg2:
+            st.write("")
+            if st.button("Create Group", type="primary", use_container_width=True) and new_grp_name.strip():
+                gid = str(uuid.uuid4())[:8]
+                code = f"SPK-{str(uuid.uuid4())[:5].upper()}"
+                supabase.table("spark_groups").insert({
+                    "group_id": gid,
+                    "group_name": new_grp_name.strip(),
+                    "invite_code": code,
+                    "owner_email": my_email,
+                    "members": [my_email],
+                    "banned_users": [],
+                }).execute()
+                st.session_state["active_group_id"] = gid
+                st.success(f"Created **{new_grp_name.strip()}**! Share Invite Code: `{code}`")
+                st.rerun()
+
+    with tab_join:
+        jg1, jg2 = st.columns([2, 1])
+        with jg1:
+            join_code = st.text_input("Enter Friend's Invite Code (e.g., SPK-9A2F1):", key="join_code").strip().upper()
+        with jg2:
+            st.write("")
+            if st.button("Join Group", type="primary", use_container_width=True) and join_code:
+                found = supabase.table("spark_groups").select("*").eq("invite_code", join_code).execute()
+                if not found.data:
+                    st.error("❌ Invalid or expired invite code.")
+                else:
+                    grp = next(iter(found.data))
+                    if my_email in (grp.get("banned_users") or []):
+                        st.error("🚫 You were banned from this group by the owner.")
+                    else:
+                        members = grp.get("members") or []
+                        if my_email not in members:
+                            members.append(my_email)
+                            supabase.table("spark_groups").update({"members": members}).eq("group_id", grp["group_id"]).execute()
+                        st.session_state["active_group_id"] = grp["group_id"]
+                        st.rerun()
+
+    st.divider()
+
+    # Load all groups where user is a member
+    all_groups_res = supabase.table("spark_groups").select("*").execute()
+    my_groups = [
+        g for g in (all_groups_res.data or [])
+        if my_email in (g.get("members") or []) and my_email not in (g.get("banned_users") or [])
+    ]
+
+    if not my_groups:
+        st.info("👋 You haven't joined any groups yet! Create a group above or enter a friend's invite code.")
+        st.stop()
+
+    group_map = {g["group_id"]: g for g in my_groups}
+    group_ids = list(group_map.keys())
+    default_idx = group_ids.index(st.session_state["active_group_id"]) if st.session_state.get("active_group_id") in group_map else 0
+
+    sel_col1, sel_col2 = st.columns([3, 1])
+    with sel_col1:
+        selected_gid = st.selectbox(
+            "💬 Your Saved Groups:",
+            options=group_ids,
+            index=default_idx,
+            format_func=lambda gid: f"{group_map[gid]['group_name']} ({len(group_map[gid].get('members') or [])} members)"
+        )
+        st.session_state["active_group_id"] = selected_gid
+    with sel_col2:
         st.write("")
-        if st.button("🔄 Refresh Chat", use_container_width=True):
+        if st.button("🔄 Refresh", use_container_width=True):
             st.rerun()
 
-        # Load or register room ownership
-    try:
-        room_res = supabase.table("spark_social_rooms").select("*").eq("room_code", room_code).execute()
-        if room_res.data:
-            room_info = room_res.data[0]
-        else:
-            room_info = {"room_code": room_code, "owner_email": my_email, "is_locked": False, "banned_users": []}
-            supabase.table("spark_social_rooms").upsert(room_info).execute()
-    except Exception as db_err:
-        st.error(f"Supabase Room Error: {db_err}")
-        st.stop()
-    owner_email = room_info.get("owner_email", "")
+    active_grp = group_map[selected_gid]
+    owner_email = active_grp.get("owner_email", "")
     is_owner = (owner_email == my_email)
-    banned_list = room_info.get("banned_users") or []
-    is_locked = bool(room_info.get("is_locked", False))
+    members_list = active_grp.get("members") or []
+    banned_list = active_grp.get("banned_users") or []
 
-    if my_email in banned_list:
-        st.error("🚫 You were kicked and banned from this room by the Room Owner.")
-        st.stop()
-    if is_locked and not is_owner:
-        st.warning("🔒 This room is currently locked by the Room Owner.")
-        st.stop()
-    # Owner Controls (Kick / Unban / Lock)
+    st.caption(f"🔑 Invite Code: **`{active_grp['invite_code']}`**  |  👑 Owner: **{owner_email.split('@')}**")
+
+    # Owner Controls: Rotate Invite Code (keeps current members!), Kick & Ban, Unban
     if is_owner:
-        with st.expander("👑 Room Owner Controls (Kick, Unban & Lock)", expanded=False):
+        with st.expander("👑 Group Owner Controls (New Invite Code, Kick & Unban)", expanded=False):
             oc1, oc2, oc3 = st.columns(3)
             with oc1:
-                new_lock = st.toggle("🔒 Lock Room (block new joiners)", value=is_locked)
-                if new_lock != is_locked:
-                    supabase.table("spark_social_rooms").update({"is_locked": new_lock}).eq("room_code", room_code).execute()
+                st.write("**Rotate Invite Code**")
+                st.caption("Current members stay in the group; newcomers must use the new code.")
+                if st.button("🔄 Generate New Code", use_container_width=True):
+                    new_code = f"SPK-{str(uuid.uuid4())[:5].upper()}"
+                    supabase.table("spark_groups").update({"invite_code": new_code}).eq("group_id", selected_gid).execute()
+                    st.success(f"New code: {new_code}")
                     st.rerun()
             with oc2:
-                kick_email = st.text_input("Kick member by email/username:")
-                if st.button("🚫 Kick & Ban", type="primary") and kick_email.strip():
-                    target = kick_email.strip().lower()
-                    if "@" not in target:
-                        target = f"{target}@sparkchat.local"
-                    if target != my_email and target not in banned_list:
-                        banned_list.append(target)
-                        supabase.table("spark_social_rooms").update({"banned_users": banned_list}).eq("room_code", room_code).execute()
-                        st.success(f"Kicked {target}!")
+                other_members = [m for m in members_list if m != my_email]
+                if other_members:
+                    kick_target = st.selectbox("Select member to kick:", other_members)
+                    if st.button("🚫 Kick & Ban", type="primary", use_container_width=True):
+                        updated_members = [m for m in members_list if m != kick_target]
+                        if kick_target not in banned_list:
+                            banned_list.append(kick_target)
+                        supabase.table("spark_groups").update({
+                            "members": updated_members,
+                            "banned_users": banned_list
+                        }).eq("group_id", selected_gid).execute()
                         st.rerun()
+                else:
+                    st.caption("No other members to kick yet.")
             with oc3:
                 if banned_list:
                     unban_target = st.selectbox("Select banned user:", banned_list)
-                    if st.button("✅ Unban User"):
+                    if st.button("✅ Unban User", use_container_width=True):
                         banned_list = [u for u in banned_list if u != unban_target]
-                        supabase.table("spark_social_rooms").update({"banned_users": banned_list}).eq("room_code", room_code).execute()
-                        st.success(f"Unbanned {unban_target}!")
+                        supabase.table("spark_groups").update({"banned_users": banned_list}).eq("group_id", selected_gid).execute()
                         st.rerun()
                 else:
-                    st.caption("No banned users in this room.")
-    # Display room messages
+                    st.caption("No banned users.")
+
+    # Display Group Messages
     msgs_res = (
-        supabase.table("spark_social_messages")
+        supabase.table("spark_group_messages")
         .select("*")
-        .eq("room_code", room_code)
+        .eq("group_id", selected_gid)
         .order("id", desc=False)
-        .limit(60)
+        .limit(80)
         .execute()
     )
     for m in msgs_res.data or []:
@@ -905,30 +964,25 @@ if action_mode == "👥 Live Friend Chat":
         crown = " 👑" if m_email == owner_email else ""
         av = get_valid_avatar(m.get("sender_avatar"), "⚡" if m_email == "spark@ai" else "💎")
         with st.chat_message("assistant" if m_email == "spark@ai" else "user", avatar=av):
-            st.caption(f"**{m.get('sender_name', 'User')}{crown}**  `({m_email})`")
+            st.caption(f"**{m.get('sender_name', 'User')}{crown}**")
             st.markdown(m.get("content", ""))
-            if is_owner and m_email not in (my_email, "spark@ai") and m_email not in banned_list:
-                if st.button(f"🚫 Kick {m.get('sender_name')}", key=f"kick_{m['id']}"):
-                    banned_list.append(m_email)
-                    supabase.table("spark_social_rooms").update({"banned_users": banned_list}).eq("room_code", room_code).execute()
-                    st.rerun()
 
-    # Send message (+ optional @spark AI reply in group)
-    friend_msg = st.chat_input(f"Message #{room_code} (type @spark to ask Spark AI)...")
-    if friend_msg:
+    # Send Message (+ optional @spark group AI)
+    group_msg = st.chat_input(f"Message {active_grp['group_name']} (type @spark to ask Spark AI)...")
+    if group_msg:
         my_av = st.session_state.user_avatar if len(str(st.session_state.user_avatar)) <= 8 else "💎"
-        supabase.table("spark_social_messages").insert({
-            "room_code": room_code,
+        supabase.table("spark_group_messages").insert({
+            "group_id": selected_gid,
             "sender_email": my_email,
             "sender_name": display_name,
             "sender_avatar": my_av,
-            "content": friend_msg,
+            "content": group_msg,
         }).execute()
 
-        if "@spark" in friend_msg.lower():
-            ai_reply = get_spark_reply("💬 Smart Chat & Vision", PERSONALITIES[selected_mood], friend_msg, [friend_msg])
-            supabase.table("spark_social_messages").insert({
-                "room_code": room_code,
+        if "@spark" in group_msg.lower():
+            ai_reply = get_spark_reply("💬 Smart Chat & Vision", PERSONALITIES[selected_mood], group_msg, [group_msg])
+            supabase.table("spark_group_messages").insert({
+                "group_id": selected_gid,
                 "sender_email": "spark@ai",
                 "sender_name": "Spark AI",
                 "sender_avatar": "⚡",
