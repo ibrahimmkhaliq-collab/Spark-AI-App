@@ -4,7 +4,7 @@ from google.genai import types
 from supabase import create_client
 from PIL import Image
 from pptx import Presentation
-from edge_tts import edge-tts
+from edge_tts import edge_tts
 from duckduckgo_search import DDGS
 import matplotlib.pyplot as plt
 import base64
