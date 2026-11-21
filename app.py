@@ -826,7 +826,7 @@ if action_mode == "👥 Live Friend Chat":
         st.stop()
 
     my_email = st.session_state.user_email
-        default_nick = my_email.split("@")[0]
+    default_nick = my_email.split("@")[0]
     display_name = st.text_input("🏷️ Your Display Name:", value=default_nick).strip() or default_nick
 
     # Top Bar: Create New Group OR Join Existing Group with Invite Code
@@ -911,7 +911,7 @@ if action_mode == "👥 Live Friend Chat":
     members_list = active_grp.get("members") or []
     banned_list = active_grp.get("banned_users") or []
 
-        st.caption(f"🔑 Invite Code: **`{active_grp['invite_code']}`**  |  👑 Owner: **{owner_email.split('@')[0]}**")
+    st.caption(f"🔑 Invite Code: **`{active_grp['invite_code']}`**  |  👑 Owner: **{owner_email.split('@')[0]}**")
 
     # Owner Controls: Rotate Invite Code (keeps current members!), Kick & Ban, Unban
     if is_owner:
