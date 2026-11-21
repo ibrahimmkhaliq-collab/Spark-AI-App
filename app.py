@@ -801,8 +801,8 @@ with st.sidebar:
             st.rerun()
 
     st.divider()
-    selected_mood = st.selectbox("Spark's Focus Mode:", list(PERSONALITIES.keys()))
-     action_mode = st.radio(
+        selected_mood = st.selectbox("Spark's Focus Mode:", list(PERSONALITIES.keys()))
+    action_mode = st.radio(
         "Action Mode:",
         [
             "💬 Smart Chat & Vision",
