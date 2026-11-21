@@ -600,7 +600,7 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
             config=types.GenerateContentConfig(system_instruction=system_instruction)
         )
         return {"role": "assistant", "content": response.text}
-            if action_mode == "🎨 Generate AI Image":
+                if action_mode == "🎨 Generate AI Image":
         prompt_clean = (user_text or "A futuristic glowing spark").strip()
         image_models = [
             "gemini-nano-banana-2.1",
@@ -861,14 +861,13 @@ for idx, msg in enumerate(active_thread["messages"]):
                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 key=f"dl_{st.session_state.current_thread_id}_{idx}"
             )
-                if msg["role"] == "assistant" and msg.get("content"):
+                        if msg["role"] == "assistant" and msg.get("content"):
             cache_key = f"{st.session_state.current_thread_id}_{idx}"
             is_last_msg = (idx == len(active_thread["messages"]) - 1)
             should_auto = is_last_msg and st.session_state.pop("auto_play_last", False)
             if st.button("🔊 Read Aloud", key=f"tts_{cache_key}") or should_auto:
                 audio_bytes = text_to_speech(msg["content"], cache_key, voice_gender)
                 st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-
 # --- ATTACHMENTS & VOICE EXPANDER ---
 with st.expander("📎 Attach Image / File or 🎙️ Record Voice", expanded=False):
     col1, col2 = st.columns(2)
@@ -1011,7 +1010,7 @@ if triggered:
                     user_text=user_text,
                     gemini_contents=full_contents,
                 )
-                active_thread["messages"].append(reply_msg)
+                        active_thread["messages"].append(reply_msg)
         save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
         if auto_read and reply_msg.get("content"):
             st.session_state["auto_play_last"] = True
