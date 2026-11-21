@@ -276,6 +276,8 @@ if not st.session_state.user_email:
                         st.rerun()
                     except Exception as e:
                         st.error(f"Login failed: {e}")
+                    
+auth_email = login_email.strip() if "@" in login_email else f"{login_email.strip().lower()}@sparkchat.local"
 
         with auth_tab2:
             reg_email = st.text_input("Email", key="reg_email")
