@@ -29,9 +29,9 @@ if not api_key:
 client = genai.Client(api_key=api_key)
 
 PREFERRED_MODELS = [
-    "gemini-3.8-flash",
-    "gemini-3.5-flash",
-    "gemini-3.5-flash-lite",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.0-flash",
 ]
 
 def get_available_chat_models():
@@ -259,7 +259,7 @@ if not st.session_state.user_email:
         st.title("⚡ Welcome to Spark AI")
         st.caption("Sign in to access your private AI workspace & synced chat threads.")
         auth_tab1, auth_tab2, auth_tab3 = st.tabs(["🔐 Sign In", "✨ Create Account", "🚀 Guest Mode"])
-        
+
         with auth_tab1:
             login_email = st.text_input("Email", key="login_email")
             login_pass = st.text_input("Password", type="password", key="login_pass")
@@ -308,8 +308,8 @@ if not st.session_state.user_email:
 # --- FOCUS MODES ---
 NO_SLANG_RULE = (
     " Speak clearly, naturally, and respectfully. Never use slang words like bestie, bro, fam, or bestie-style talk. "
-    "Do NOT mention your creator or who made you unless the user explicitly asks who created, built, or made you—"
-    "only if asked, state that you are Spark AI, created by Ibrahim Muneeb Khaliq."
+    "NEVER mention who created, built, or made you unless the user explicitly asks 'who created you', 'who built you', or 'who made you'. "
+    "If asked, state that you are Spark AI, created by Ibrahim Muneeb Khaliq."
 )
 
 PERSONALITIES = {
@@ -606,10 +606,8 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
     if action_mode == "🎨 Generate AI Image":
         prompt_clean = (user_text or "A futuristic glowing spark").strip()
         image_models = [
-            "gemini-nano-banana-2.1",
-            "gemini-3.1-flash-image",
-            "gemini-3.1-flash-lite-image",
             "gemini-2.5-flash-image",
+            "imagen-3.0-generate-002",
         ]
         last_img_err = ""
         for img_model in image_models:
