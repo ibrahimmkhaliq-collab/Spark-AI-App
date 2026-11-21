@@ -843,7 +843,7 @@ if action_mode == "👥 Live Friend Chat":
     try:
         room_res = supabase.table("spark_social_rooms").select("*").eq("room_code", room_code).execute()
         if room_res.data:
-            room_info = room_res.data
+            room_info = room_res.data[0]
         else:
             room_info = {"room_code": room_code, "owner_email": my_email, "is_locked": False, "banned_users": []}
             supabase.table("spark_social_rooms").upsert(room_info).execute()
