@@ -277,7 +277,7 @@ if not st.session_state.user_email:
                     except Exception as e:
                         st.error(f"Login failed: {e}")
 auth_email = login_email.strip() if "@" in login_email else f"{login_email.strip().lower()}@sparkchat.local"
-        with auth_tab2:
+with auth_tab2:
             reg_email = st.text_input("Email", key="reg_email")
             reg_pass = st.text_input("Password (min 6 chars)", type="password", key="reg_pass")
             if st.button("Create Account", type="primary", use_container_width=True):
