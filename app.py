@@ -278,8 +278,8 @@ if not st.session_state.user_email:
                     except Exception as e:
                         st.error(f"Login failed: {e}")
 
-        with auth_tab2:
-
+                with auth_tab2:
+            reg_email = st.text_input("Email", key="reg_email")
             reg_pass = st.text_input("Password (min 6 chars)", type="password", key="reg_pass")
             if st.button("Create Account", type="primary", use_container_width=True):
                 if not supabase:
@@ -600,48 +600,48 @@ def get_spark_reply(action_mode, system_instruction, user_text, gemini_contents)
             config=types.GenerateContentConfig(system_instruction=system_instruction)
         )
         return {"role": "assistant", "content": response.text}
-        if action_mode == "🎨 Generate AI Image":
-            prompt_clean = (user_text or "A futuristic glowing spark").strip()
-            image_models = [
-                "gemini-nano-banana-2.1",
-                "gemini-3.1-flash-image",
-                "gemini-3.1-flash-lite-image",
-                "gemini-2.5-flash-image",
-            ]
-            last_img_err = ""
-            for img_model in image_models:
-                try:
-                    res = client.models.generate_content(
-                        model=img_model,
-                        contents=f"Generate an image of: {prompt_clean}",
-                        config=types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"]),
-                    )
-                    if res.candidates and res.candidates.content.parts:
-                        for part in res.candidates.content.parts:
-                            if part.inline_data and part.inline_data.data:
-                                gen_img = Image.open(io.BytesIO(part.inline_data.data))
-                                return {
-                                    "role": "assistant",
-                                    "content": f"Here is your generated image for: **{prompt_clean}**",
-                                    "image": gen_img,
-                                }
-                except Exception as e:
-                    last_img_err = str(e)
-                    continue
-    
+            if action_mode == "🎨 Generate AI Image":
+        prompt_clean = (user_text or "A futuristic glowing spark").strip()
+        image_models = [
+            "gemini-nano-banana-2.1",
+            "gemini-3.1-flash-image",
+            "gemini-3.1-flash-lite-image",
+            "gemini-2.5-flash-image",
+        ]
+        last_img_err = ""
+        for img_model in image_models:
             try:
-                encoded_prompt = urllib.parse.quote(prompt_clean)
-                fallback_url = f"https://pollinations.ai{encoded_prompt}?width=1024&height=1024&nologo=true"
-                req = urllib.request.Request(fallback_url, headers={"User-Agent": "Mozilla/5.0"})
-                with urllib.request.urlopen(req, timeout=45) as resp:
-                    gen_img = Image.open(io.BytesIO(resp.read()))
-                    return {
-                        "role": "assistant",
-                        "content": f"Here is your generated image for: **{prompt_clean}**",
-                        "image": gen_img,
-                    }
-            except Exception as fallback_err:
-                raise RuntimeError(f"Image generation failed ({last_img_err or fallback_err}).")
+                res = client.models.generate_content(
+                    model=img_model,
+                    contents=f"Generate an image of: {prompt_clean}",
+                    config=types.GenerateContentConfig(response_modalities=["IMAGE", "TEXT"]),
+                )
+                if res.candidates and res.candidates[0].content.parts:
+                    for part in res.candidates[0].content.parts:
+                        if part.inline_data and part.inline_data.data:
+                            gen_img = Image.open(io.BytesIO(part.inline_data.data))
+                            return {
+                                "role": "assistant",
+                                "content": f"Here is your generated image for: **{prompt_clean}**",
+                                "image": gen_img,
+                            }
+            except Exception as e:
+                last_img_err = str(e)
+                continue
+
+        try:
+            encoded_prompt = urllib.parse.quote(prompt_clean)
+            fallback_url = f"https://pollinations.ai{encoded_prompt}?width=1024&height=1024&nologo=true"
+            req = urllib.request.Request(fallback_url, headers={"User-Agent": "Mozilla/5.0"})
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                gen_img = Image.open(io.BytesIO(resp.read()))
+                return {
+                    "role": "assistant",
+                    "content": f"Here is your generated image for: **{prompt_clean}**",
+                    "image": gen_img,
+                }
+        except Exception as fallback_err:
+            raise RuntimeError(f"Image generation failed ({last_img_err or fallback_err}).")
     if action_mode == "📊 Build Presentation Slide":
         ppt_prompt = (
             f"Create a 5-slide presentation about: {user_text}. "
@@ -861,9 +861,11 @@ for idx, msg in enumerate(active_thread["messages"]):
                 mime="application/vnd.openxmlformats-officedocument.presentationml.presentation",
                 key=f"dl_{st.session_state.current_thread_id}_{idx}"
             )
-        if msg["role"] == "assistant" and msg.get("content"):
+                if msg["role"] == "assistant" and msg.get("content"):
             cache_key = f"{st.session_state.current_thread_id}_{idx}"
-            if st.button("🔊 Read Aloud", key=f"tts_{cache_key}"):
+            is_last_msg = (idx == len(active_thread["messages"]) - 1)
+            should_auto = is_last_msg and st.session_state.pop("auto_play_last", False)
+            if st.button("🔊 Read Aloud", key=f"tts_{cache_key}") or should_auto:
                 audio_bytes = text_to_speech(msg["content"], cache_key, voice_gender)
                 st.audio(audio_bytes, format="audio/mp3", autoplay=True)
 
@@ -1009,8 +1011,10 @@ if triggered:
                     user_text=user_text,
                     gemini_contents=full_contents,
                 )
-        active_thread["messages"].append(reply_msg)
+                active_thread["messages"].append(reply_msg)
         save_thread_to_supabase(st.session_state.current_thread_id, active_thread)
+        if auto_read and reply_msg.get("content"):
+            st.session_state["auto_play_last"] = True
         st.rerun()
     except Exception as e:
         st.error(f"Error: {e}")
