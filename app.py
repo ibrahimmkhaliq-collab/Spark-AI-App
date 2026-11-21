@@ -839,14 +839,17 @@ if action_mode == "👥 Live Friend Chat":
         if st.button("🔄 Refresh Chat", use_container_width=True):
             st.rerun()
 
-    # Load or register room ownership
-    room_res = supabase.table("spark_social_rooms").select("*").eq("room_code", room_code).execute()
-    if room_res.data:
-        room_info = room_res.data[0]
-    else:
-        room_info = {"room_code": room_code, "owner_email": my_email, "is_locked": False, "banned_users": []}
-        supabase.table("spark_social_rooms").insert(room_info).execute()
-
+        # Load or register room ownership
+    try:
+        room_res = supabase.table("spark_social_rooms").select("*").eq("room_code", room_code).execute()
+        if room_res.data:
+            room_info = room_res.data
+        else:
+            room_info = {"room_code": room_code, "owner_email": my_email, "is_locked": False, "banned_users": []}
+            supabase.table("spark_social_rooms").upsert(room_info).execute()
+    except Exception as db_err:
+        st.error(f"Supabase Room Error: {db_err}")
+        st.stop()
     owner_email = room_info.get("owner_email", "")
     is_owner = (owner_email == my_email)
     banned_list = room_info.get("banned_users") or []
@@ -858,11 +861,10 @@ if action_mode == "👥 Live Friend Chat":
     if is_locked and not is_owner:
         st.warning("🔒 This room is currently locked by the Room Owner.")
         st.stop()
-
-    # Owner Controls (Kick / Lock)
+    # Owner Controls (Kick / Unban / Lock)
     if is_owner:
-        with st.expander("👑 Room Owner Controls (Kick & Lock)", expanded=False):
-            oc1, oc2 = st.columns(2)
+        with st.expander("👑 Room Owner Controls (Kick, Unban & Lock)", expanded=False):
+            oc1, oc2, oc3 = st.columns(3)
             with oc1:
                 new_lock = st.toggle("🔒 Lock Room (block new joiners)", value=is_locked)
                 if new_lock != is_locked:
@@ -870,16 +872,25 @@ if action_mode == "👥 Live Friend Chat":
                     st.rerun()
             with oc2:
                 kick_email = st.text_input("Kick member by email/username:")
-                if st.button("🚫 Kick & Ban User", type="primary") and kick_email.strip():
+                if st.button("🚫 Kick & Ban", type="primary") and kick_email.strip():
                     target = kick_email.strip().lower()
                     if "@" not in target:
                         target = f"{target}@sparkchat.local"
                     if target != my_email and target not in banned_list:
                         banned_list.append(target)
                         supabase.table("spark_social_rooms").update({"banned_users": banned_list}).eq("room_code", room_code).execute()
-                        st.success(f"Kicked {target} from #{room_code}!")
+                        st.success(f"Kicked {target}!")
                         st.rerun()
-
+            with oc3:
+                if banned_list:
+                    unban_target = st.selectbox("Select banned user:", banned_list)
+                    if st.button("✅ Unban User"):
+                        banned_list = [u for u in banned_list if u != unban_target]
+                        supabase.table("spark_social_rooms").update({"banned_users": banned_list}).eq("room_code", room_code).execute()
+                        st.success(f"Unbanned {unban_target}!")
+                        st.rerun()
+                else:
+                    st.caption("No banned users in this room.")
     # Display room messages
     msgs_res = (
         supabase.table("spark_social_messages")
