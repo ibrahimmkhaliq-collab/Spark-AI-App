@@ -802,7 +802,7 @@ with st.sidebar:
 
     st.divider()
     selected_mood = st.selectbox("Spark's Focus Mode:", list(PERSONALITIES.keys()))
-    action_mode = st.radio(
+     action_mode = st.radio(
         "Action Mode:",
         [
             "💬 Smart Chat & Vision",
@@ -810,6 +810,7 @@ with st.sidebar:
             "🎨 Generate AI Image",
             "📊 Build Presentation Slide",
             "📈 Create Data Chart",
+            "👥 Live Friend Chat",
         ]
     )
     st.divider()
@@ -817,7 +818,112 @@ with st.sidebar:
     selected_voice_label = st.selectbox("🗣️ Voice & Vibe:", list(SPARK_VOICES[selected_gender].keys()))
     voice_gender = SPARK_VOICES[selected_gender][selected_voice_label]
     auto_read = st.toggle("🔊 Auto-Read Spark's Replies", value=False)
+# --- LIVE FRIEND CHAT MODE ---
+if action_mode == "👥 Live Friend Chat":
+    st.title("👥 Spark Live Friend Chat")
+    if not supabase or st.session_state.user_email == "guest@local":
+        st.warning("⚠️ Sign in with an account (not Guest Mode) to join or create friend rooms.")
+        st.stop()
 
+    my_email = st.session_state.user_email
+    default_nick = my_email.split("@")[0]
+
+    c1, c2, c3 = st.columns([1.2, 1.2, 0.8])
+    with c1:
+        room_code = st.text_input("🔑 Room Code:", value="general").strip().lower() or "general"
+    with c2:
+        display_name = st.text_input("🏷️ Your Nickname:", value=default_nick).strip() or default_nick
+    with c3:
+        st.write("")
+        if st.button("🔄 Refresh Chat", use_container_width=True):
+            st.rerun()
+
+    # Load or register room ownership
+    room_res = supabase.table("spark_social_rooms").select("*").eq("room_code", room_code).execute()
+    if room_res.data:
+        room_info = room_res.data[0]
+    else:
+        room_info = {"room_code": room_code, "owner_email": my_email, "is_locked": False, "banned_users": []}
+        supabase.table("spark_social_rooms").insert(room_info).execute()
+
+    owner_email = room_info.get("owner_email", "")
+    is_owner = (owner_email == my_email)
+    banned_list = room_info.get("banned_users") or []
+    is_locked = bool(room_info.get("is_locked", False))
+
+    if my_email in banned_list:
+        st.error("🚫 You were kicked and banned from this room by the Room Owner.")
+        st.stop()
+    if is_locked and not is_owner:
+        st.warning("🔒 This room is currently locked by the Room Owner.")
+        st.stop()
+
+    # Owner Controls (Kick / Lock)
+    if is_owner:
+        with st.expander("👑 Room Owner Controls (Kick & Lock)", expanded=False):
+            oc1, oc2 = st.columns(2)
+            with oc1:
+                new_lock = st.toggle("🔒 Lock Room (block new joiners)", value=is_locked)
+                if new_lock != is_locked:
+                    supabase.table("spark_social_rooms").update({"is_locked": new_lock}).eq("room_code", room_code).execute()
+                    st.rerun()
+            with oc2:
+                kick_email = st.text_input("Kick member by email/username:")
+                if st.button("🚫 Kick & Ban User", type="primary") and kick_email.strip():
+                    target = kick_email.strip().lower()
+                    if "@" not in target:
+                        target = f"{target}@sparkchat.local"
+                    if target != my_email and target not in banned_list:
+                        banned_list.append(target)
+                        supabase.table("spark_social_rooms").update({"banned_users": banned_list}).eq("room_code", room_code).execute()
+                        st.success(f"Kicked {target} from #{room_code}!")
+                        st.rerun()
+
+    # Display room messages
+    msgs_res = (
+        supabase.table("spark_social_messages")
+        .select("*")
+        .eq("room_code", room_code)
+        .order("id", desc=False)
+        .limit(60)
+        .execute()
+    )
+    for m in msgs_res.data or []:
+        m_email = m.get("sender_email", "")
+        crown = " 👑" if m_email == owner_email else ""
+        av = get_valid_avatar(m.get("sender_avatar"), "⚡" if m_email == "spark@ai" else "💎")
+        with st.chat_message("assistant" if m_email == "spark@ai" else "user", avatar=av):
+            st.caption(f"**{m.get('sender_name', 'User')}{crown}**  `({m_email})`")
+            st.markdown(m.get("content", ""))
+            if is_owner and m_email not in (my_email, "spark@ai") and m_email not in banned_list:
+                if st.button(f"🚫 Kick {m.get('sender_name')}", key=f"kick_{m['id']}"):
+                    banned_list.append(m_email)
+                    supabase.table("spark_social_rooms").update({"banned_users": banned_list}).eq("room_code", room_code).execute()
+                    st.rerun()
+
+    # Send message (+ optional @spark AI reply in group)
+    friend_msg = st.chat_input(f"Message #{room_code} (type @spark to ask Spark AI)...")
+    if friend_msg:
+        my_av = st.session_state.user_avatar if len(str(st.session_state.user_avatar)) <= 8 else "💎"
+        supabase.table("spark_social_messages").insert({
+            "room_code": room_code,
+            "sender_email": my_email,
+            "sender_name": display_name,
+            "sender_avatar": my_av,
+            "content": friend_msg,
+        }).execute()
+
+        if "@spark" in friend_msg.lower():
+            ai_reply = get_spark_reply("💬 Smart Chat & Vision", PERSONALITIES[selected_mood], friend_msg, [friend_msg])
+            supabase.table("spark_social_messages").insert({
+                "room_code": room_code,
+                "sender_email": "spark@ai",
+                "sender_name": "Spark AI",
+                "sender_avatar": "⚡",
+                "content": ai_reply.get("content", ""),
+            }).execute()
+        st.rerun()
+    st.stop()
 # --- MAIN HEADER ---
 st.title(f"⚡ {active_thread['title']}")
 st.caption(f"Current Mode: **{selected_mood}** | **{action_mode}**")
