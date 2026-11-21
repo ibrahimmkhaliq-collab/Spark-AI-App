@@ -258,7 +258,7 @@ if not st.session_state.user_email:
 
         st.title("⚡ Welcome to Spark AI")
         st.caption("Sign in to access your private AI workspace & synced chat threads.")
-                auth_tab1, auth_tab2, auth_tab3 = st.tabs(["🔐 Sign In", "✨ Create Account", "🚀 Guest Mode"])
+        auth_tab1, auth_tab2, auth_tab3 = st.tabs(["🔐 Sign In", "✨ Create Account", "🚀 Guest Mode"])
 
         with auth_tab1:
             login_email = st.text_input("Username or Email", key="login_email")
@@ -295,11 +295,12 @@ if not st.session_state.user_email:
                                 st.query_params["rt"] = res.session.refresh_token
                             st.success("Account created! Loading Spark AI...")
                             st.rerun()
-                    except Exception as e:
+                                        except Exception as e:
                         st.error(f"Sign up failed: {e}")
-                               else:
+                else:
                     st.warning("Enter a valid username/email and a password with at least 6 characters.")
 
+                    st.warning("Enter a valid username/email and a password with at least 6 characters.")
         with auth_tab3:
             st.info("Try Spark AI without saving threads to the cloud.")
             if st.button("Continue as Guest", use_container_width=True):
@@ -828,7 +829,7 @@ if action_mode == "👥 Live Friend Chat":
         st.stop()
 
     my_email = st.session_state.user_email
-    default_nick = my_email.split("@")
+        default_nick = my_email.split("@")[0]
     display_name = st.text_input("🏷️ Your Display Name:", value=default_nick).strip() or default_nick
 
     # Top Bar: Create New Group OR Join Existing Group with Invite Code
@@ -913,7 +914,7 @@ if action_mode == "👥 Live Friend Chat":
     members_list = active_grp.get("members") or []
     banned_list = active_grp.get("banned_users") or []
 
-    st.caption(f"🔑 Invite Code: **`{active_grp['invite_code']}`**  |  👑 Owner: **{owner_email.split('@')}**")
+        st.caption(f"🔑 Invite Code: **`{active_grp['invite_code']}`**  |  👑 Owner: **{owner_email.split('@')[0]}**")
 
     # Owner Controls: Rotate Invite Code (keeps current members!), Kick & Ban, Unban
     if is_owner:
