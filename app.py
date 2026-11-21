@@ -277,7 +277,6 @@ if not st.session_state.user_email:
                         st.rerun()
                     except Exception as e:
                         st.error(f"Login failed: {e}")
-
         with auth_tab2:
             reg_email = st.text_input("Choose a Username or Email", key="reg_email")
             reg_pass = st.text_input("Password (min 6 chars)", type="password", key="reg_pass")
@@ -286,7 +285,7 @@ if not st.session_state.user_email:
                     st.error("Supabase keys are missing in Secrets.")
                 elif reg_email and len(reg_pass) >= 6:
                     auth_email = reg_email.strip() if "@" in reg_email else f"{reg_email.strip().lower()}@sparkchat.local"
-                                        try:
+                    try:
                         res = supabase.auth.sign_up({"email": auth_email, "password": reg_pass})
                         if res.user:
                             st.session_state.user_email = res.user.email
